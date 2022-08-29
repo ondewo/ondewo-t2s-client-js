@@ -1,0 +1,7 @@
+*/lib/
+example/lib
+.idea
+*.env
+node_modules
+npm
+.vscode
