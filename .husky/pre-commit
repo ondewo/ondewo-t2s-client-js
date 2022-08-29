@@ -1,0 +1,5 @@
+#!/bin/sh
+
+
+./node_modules/.bin/eslint .
+make prettier
