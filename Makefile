@@ -18,7 +18,7 @@ export
 ONDEWO_T2S_VERSION = 4.3.0
 
 T2S_API_GIT_BRANCH=tags/4.3.0
-ONDEWO_PROTO_COMPILER_GIT_BRANCH=master
+ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/4.1.1
 ONDEWO_PROTO_COMPILER_DIR=ondewo-proto-compiler
 T2S_APIS_DIR=src/ondewo-t2s-api
 T2S_PROTOS_DIR=${T2S_APIS_DIR}/ondewo
@@ -65,6 +65,21 @@ help: ## Print usage info about help targets
 
 makefile_chapters: ## Shows all sections of Makefile
 	@echo `cat Makefile| grep "########################################################" -A 1 | grep -v "########################################################"`
+
+check_build: #Checks if all built proto-code is there
+	@rm -rf build_check.txt
+	@for proto in `find src/ondewo-t2s-api/ondewo -iname "*.proto*"`; \
+	do \
+		cat $${proto} | grep import | grep "google/" | cut -d "\"" -f 2 | cut -d "." -f 1 >> build_check.txt; \
+		echo $${proto} | cut -d "/" -f 3-5 | cut -d "." -f 1 >> build_check.txt; \
+	done
+	@echo "`sort build_check.txt | uniq`" > build_check.txt
+	@for file in `cat build_check.txt`;\
+	do \
+		cat api/ondewo_t2s_api.js | grep -q $${file};\
+		if test $$? != 0; then  echo "No Proto-Code for $${file} in api/ondewo_t2s_api.js" & exit 1;fi \
+	done
+	@rm -rf build_check.txt
 
 ########################################################
 #       Repo Specific Make Targets
