@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"target": "es6",
+		"module": "commonjs",
+		"strict": true,
+		"allowJs": true,
+		"outDir": "./dist",
+		"types": ["node"]
+	},
+	"include": ["examples/client.js", "*.ts", "*.js"],
+	"exclude": ["node_modules", "api"]
+}
