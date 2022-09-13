@@ -30,7 +30,7 @@ IMAGE_UTILS_NAME=ondewo-t2s-client-utils-js:${ONDEWO_T2S_VERSION}
 PRETTIER_WRITE?=
 
 CURRENT_RELEASE_NOTES=`cat RELEASE.md \
-	| sed -n '/Release ONDEWO T2S JS Client ${ONDEWO_T2S_VERSION}/,/\*\*/p'`
+	| sed -n '/Release ONDEWO T2S Js Client ${ONDEWO_T2S_VERSION}/,/\*\*/p'`
 
 
 GH_REPO="https://github.com/ondewo/ondewo-t2s-client-js"
