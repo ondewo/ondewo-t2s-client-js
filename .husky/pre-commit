@@ -1,5 +1,5 @@
 #!/bin/sh
 
-
-./node_modules/.bin/eslint .
-make prettier
+set -e
+make eslint
+make prettier PRETTIER_WRITE=-w
