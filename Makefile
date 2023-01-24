@@ -193,8 +193,8 @@ update_package: ## Updates Package Version in src/package.json
 	@sed -i "s/\"version\": \"[0-9]*.[0-9]*.[0-9]\"/\"version\": \"${ONDEWO_T2S_VERSION}\"/g" src/package.json
 
 build: check_out_correct_submodule_versions build_compiler update_package npm_run_build ## Build Code with Proto-Compiler
-	@echo "################### PROMT FOR CHANGING FILE OWNERSHIP FROM ROOT TO YOU ##########################"
-	@for f in `ls -la | grep root | cut -c 55-200`; \
+	@echo "################### PROMPT FOR CHANGING FILE OWNERSHIP FROM ROOT TO YOU ##########################"
+	@for f in `find . -group root`; \
 	do \
 		sudo chown -R `whoami`:`whoami` $$f && echo $$f; \
 	done
@@ -203,6 +203,9 @@ build: check_out_correct_submodule_versions build_compiler update_package npm_ru
 	cp src/RELEASE.md .
 	make remove_npm_script
 	make create_npm_package
+	@$(eval README_CUT_LINES:=$(shell cat -n src/README.md | sed -n "/START OF GITHUB README/,/END OF GITHUB README/p" | grep -o -E '[0-9]+' | sed -e 's/^0\+//' | awk 'NR==1; END{print}'))
+	@$(eval DELETE_LINES:=$(shell echo ${README_CUT_LINES}| sed -e "s/[[:space:]]/,/"))
+	@sed -i "${DELETE_LINES}d" npm/README.md
 	make install_dependencies
 
 
