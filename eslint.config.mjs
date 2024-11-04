@@ -22,7 +22,10 @@ export default [
 				// Add any global variables you want to recognize
 				window: true,
 				document: true,
-				console: true // Allow the use of console globally
+				console: true,
+				XMLHttpRequest: true,
+				uuidv4: true,
+				t2s: true
 			},
 			ecmaVersion: 2020, // Set ECMAScript version
 			sourceType: 'module' // If using ES modules
