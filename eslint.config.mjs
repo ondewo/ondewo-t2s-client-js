@@ -1,9 +1,6 @@
-import typescriptEslint from '@typescript-eslint/eslint-plugin';
-import globals from 'globals';
-import tsParser from '@typescript-eslint/parser';
+import js from '@eslint/js'; // Core ESLint configuration
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,93 +13,30 @@ const compat = new FlatCompat({
 
 export default [
 	{
-		ignores: ['**/api/', 'src/ondewo-t2s-api', '**/ondewo-proto-compiler', '**/*.mjs']
+		ignores: ['**/api/', 'src/ondewo-t2s-api', '**/ondewo-proto-compiler']
 	},
-	...compat.extends(
-		'plugin:@typescript-eslint/recommended',
-		'plugin:@typescript-eslint/recommended-requiring-type-checking'
-	),
 	{
-		plugins: {
-			'@typescript-eslint': typescriptEslint
-		},
-
+		files: ['**/*.js'], // Target all JavaScript files
 		languageOptions: {
 			globals: {
-				...globals.browser
+				// Add any global variables you want to recognize
+				window: true,
+				document: true,
+				console: true // Allow the use of console globally
 			},
-
-			parser: tsParser,
-			ecmaVersion: 12,
-			sourceType: 'module',
-
-			parserOptions: {
-				project: 'tsconfig.json'
-			}
+			ecmaVersion: 2020, // Set ECMAScript version
+			sourceType: 'module' // If using ES modules
 		},
-
 		rules: {
-			'@typescript-eslint/explicit-member-accessibility': [
-				'error',
-				{
-					accessibility: 'explicit',
-
-					overrides: {
-						accessors: 'explicit',
-						parameterProperties: 'explicit'
-					}
-				}
-			],
-
-			'@typescript-eslint/no-inferrable-types': ['off'],
-
-			'@typescript-eslint/array-type': [
-				'error',
-				{
-					default: 'array'
-				}
-			],
-
-			'@typescript-eslint/unbound-method': [
-				'warn',
-				{
-					ignoreStatic: true
-				}
-			],
-
-			'@typescript-eslint/no-unsafe-member-access': ['warn'],
-			'@typescript-eslint/no-this-alias': ['warn'],
-
-			'@typescript-eslint/no-misused-promises': [
-				'error',
-				{
-					checksVoidReturn: false
-				}
-			],
-
-			'@typescript-eslint/no-unsafe-call': ['off'],
-			'@typescript-eslint/no-unused-vars': ['off'],
-			'no-whitespace-before-property': ['error'],
+			...js.configs.recommended.rules,
+			'prefer-const': 'error',
 			'no-trailing-spaces': ['error'],
-
-			'@typescript-eslint/no-shadow': [
-				'error',
-				{
-					hoist: 'all'
-				}
-			],
-
-			'@typescript-eslint/no-misused-new': 'error',
-			'@typescript-eslint/no-floating-promises': 'error',
-
 			eqeqeq: ['error', 'always'],
 			semi: ['error', 'always'],
-
 			'id-denylist': ['error', 'err', 'any', 'cb', 'callback', 'i1', 'test', 'collection', 'list'],
 
 			'no-multiple-empty-lines': ['error'],
 			'no-new-wrappers': ['error'],
-			'prefer-const': ['error'],
 			'no-var': ['error'],
 			'no-multi-spaces': 'error',
 			'block-spacing': ['error', 'always'],
@@ -130,7 +64,7 @@ export default [
 					after: true
 				}
 			],
-
+			'no-ternary': 'warn',
 			'space-in-parens': ['error', 'never'],
 			'space-before-blocks': ['error', 'always'],
 			'no-return-assign': 'error',
@@ -154,59 +88,7 @@ export default [
 				{
 					afterColon: true
 				}
-			],
-
-			'@typescript-eslint/explicit-function-return-type': ['error'],
-
-			'@typescript-eslint/typedef': [
-				'error',
-				{
-					arrowParameter: true,
-					memberVariableDeclaration: true,
-					variableDeclaration: true,
-					parameter: true,
-					propertyDeclaration: true
-				}
-			],
-
-			'@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
-
-			'@typescript-eslint/no-confusing-void-expression': [
-				'error',
-				{
-					ignoreArrowShorthand: true
-				}
-			],
-
-			'@typescript-eslint/prefer-reduce-type-parameter': ['error'],
-			'default-param-last': 'off',
-			'@typescript-eslint/default-param-last': ['error'],
-			'no-redeclare': 'off',
-			'@typescript-eslint/no-redeclare': ['error'],
-			'@typescript-eslint/prefer-readonly-parameter-types': ['off'],
-			'guard-for-in': ['warn'],
-			'@typescript-eslint/no-unused-vars-experimental': ['off'],
-			'@typescript-eslint/no-explicit-any': ['warn'],
-			'@typescript-eslint/no-unsafe-assignment': ['warn'],
-			'@typescript-eslint/no-unsafe-return': ['error'],
-
-			'@typescript-eslint/explicit-module-boundary-types': [
-				'error',
-				{
-					allowArgumentsExplicitlyTypedAsAny: true
-				}
-			],
-
-			'no-ternary': 'warn',
-			'@typescript-eslint/member-ordering': ['off']
-		}
-	},
-	{
-		files: ['**/*.spec.ts'],
-		ignores: ['**/node_modules/**'],
-
-		rules: {
-			'@typescript-eslint/no-floating-promises': 'off'
+			]
 		}
 	}
 ];
