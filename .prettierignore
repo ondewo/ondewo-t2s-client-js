@@ -1,6 +1,15 @@
-RELEASE.md
-src/
-ondewo-proto-compiler
-ondewo-t2s-api
+# release automation
+ondewo-devops-accounts
+build_check.*
+build_check.txt
+build_check_temp.txt
+
 npm
-.vscode
+.idea/
+.vscode/
+node_modules
+
+ondewo-t2s-api/*
+
+.isort.cfg
+grpc_cert
