@@ -1,34 +1,34 @@
 {
-  "name": "@ondewo/ondewo-t2s-client-js",
-  "version": "5.0.0",
-  "description": "ONDEWO Text to Speech (T2S) Client library for Js",
-  "author": "ONDEWO GmbH <office@ondewo.com>",
-  "homepage": "https://ondewo.com",
-  "license": "Apache-2.0",
-  "keywords": [
-    "ondewo",
-    "t2s",
-    "api",
-    "client",
-    "js",
-    "grpc"
-  ],
-  "repository": {
-    "type": "git",
-    "directory": "https://github.com/ondewo/ondewo-t2s-client-js.git"
-  },
-  "dependencies": {
-    "google-protobuf": "3.21.4",
-    "grpc-web": "^1.5.0",
-    "webpack": "^5.96.1"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "^3.1.0",
-    "@eslint/js": "^9.14.0",
-    "@typescript-eslint/eslint-plugin": "^8.12.2",
-    "eslint": "^9.14.0",
-    "global": "^4.4.0",
-    "husky": "^9.1.6",
-    "prettier": "^3.3.3"
-  }
+	"name": "@ondewo/ondewo-t2s-client-js",
+	"version": "5.0.0",
+	"description": "ONDEWO Text to Speech (T2S) Client library for Js",
+	"author": "ONDEWO GmbH <office@ondewo.com>",
+	"homepage": "https://ondewo.com",
+	"license": "Apache-2.0",
+	"keywords": [
+		"ondewo",
+		"t2s",
+		"api",
+		"client",
+		"js",
+		"grpc"
+	],
+	"repository": {
+		"type": "git",
+		"directory": "https://github.com/ondewo/ondewo-t2s-client-js.git"
+	},
+	"dependencies": {
+		"google-protobuf": "3.21.4",
+		"grpc-web": "^1.5.0",
+		"webpack": "^5.96.1"
+	},
+	"devDependencies": {
+		"@eslint/eslintrc": "^3.1.0",
+		"@eslint/js": "^9.14.0",
+		"@typescript-eslint/eslint-plugin": "^8.12.2",
+		"eslint": "^9.14.0",
+		"global": "^4.4.0",
+		"husky": "^9.1.6",
+		"prettier": "^3.3.3"
+	}
 }
