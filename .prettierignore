@@ -10,6 +10,8 @@ npm
 node_modules
 
 ondewo-t2s-api/*
+src/ondewo-t2s-api/*
+ondewo-proto-compiler
 
 .isort.cfg
 grpc_cert
