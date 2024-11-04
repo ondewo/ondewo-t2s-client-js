@@ -1,8 +1,11 @@
 # release automation
 ondewo-devops-accounts
+ondewo-proto-compiler
 build_check.*
 build_check.txt
 build_check_temp.txt
+RELEASE.md
+README.md
 
 npm
 .idea/
@@ -10,7 +13,6 @@ npm
 node_modules
 
 ondewo-t2s-api/*
-ondewo-proto-compiler
 
 .isort.cfg
 grpc_cert
