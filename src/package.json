@@ -1,6 +1,6 @@
 {
 	"name": "@ondewo/ondewo-t2s-client-js",
-	"version": "5.0.0",
+	"version": "6.0.0",
 	"description": "ONDEWO Text to Speech (T2S) Client library for Js",
 	"author": "ONDEWO GmbH <office@ondewo.com>",
 	"homepage": "https://ondewo.com",
