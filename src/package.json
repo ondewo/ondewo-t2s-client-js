@@ -1,45 +1,45 @@
 {
-	"name": "@ondewo/ondewo-t2s-client-js",
-	"version": "6.1.0",
-	"description": "ONDEWO Text to Speech (T2S) Client library for Js",
-	"author": "ONDEWO GmbH <office@ondewo.com>",
-	"homepage": "https://ondewo.com",
-	"license": "Apache-2.0",
-	"keywords": [
-		"ondewo",
-		"t2s",
-		"api",
-		"client",
-		"js",
-		"grpc"
-	],
-	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
-		"initialize": "git submodule update --init --recursive --remote",
-		"build": "docker run -it -v ${PWD}:/input-volume -v ${PWD}/../api:/output-volume ondewo-js-proto-compiler ondewo-t2s-api ondewo-t2s-api ondewo",
-		"debug": "docker run -it --entrypoint /bin/bash -v ${PWD}/src:/input-volume -v ${PWD}/src/..:/output-volume $npm_package_config_compiler",
-		"publish-npm": "npm publish ../npm --access public",
-		"build-update": "npm run build-only && npm run start-example",
-		"start-example": "sudo cp lib/t2s.js example/lib/t2s.js && http-server example",
-		"example-link-lib": "sudo ln -s lib/t2s.js example/lib/t2s.js",
-		"build-sample": "docker run -it -v ${PWD}/src:/input-volume -v ${PWD}/src/../api:/output-volume $npm_package_config_compiler t2s ondewo-t2s-api ondewo-t2s-api ondewo"
-	},
-	"repository": {
-		"type": "git",
-		"directory": "https://github.com/ondewo/ondewo-t2s-client-js.git"
-	},
-	"dependencies": {
-		"google-protobuf": "^3.21.4",
-		"grpc-web": "^1.5.0",
-		"webpack": "^5.99.9"
-	},
-	"devDependencies": {
-		"@typescript-eslint/eslint-plugin": "^8.12.2",
-		"@eslint/eslintrc": "^3.1.0",
-		"@eslint/js": "^9.13.0",
-		"eslint": "^9.13.0",
-		"global": "^4.4.0",
-		"husky": "^9.1.6",
-		"prettier": "^3.3.3"
-	}
+  "name": "@ondewo/ondewo-t2s-client-js",
+  "version": "6.1.0",
+  "description": "ONDEWO Text to Speech (T2S) Client library for Js",
+  "author": "ONDEWO GmbH <office@ondewo.com>",
+  "homepage": "https://ondewo.com",
+  "license": "Apache-2.0",
+  "keywords": [
+    "ondewo",
+    "t2s",
+    "api",
+    "client",
+    "js",
+    "grpc"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "initialize": "git submodule update --init --recursive --remote",
+    "build": "docker run -it -v ${PWD}:/input-volume -v ${PWD}/../api:/output-volume ondewo-js-proto-compiler ondewo-t2s-api ondewo-t2s-api ondewo",
+    "debug": "docker run -it --entrypoint /bin/bash -v ${PWD}/src:/input-volume -v ${PWD}/src/..:/output-volume $npm_package_config_compiler",
+    "publish-npm": "npm publish ../npm --access public",
+    "build-update": "npm run build-only && npm run start-example",
+    "start-example": "sudo cp lib/t2s.js example/lib/t2s.js && http-server example",
+    "example-link-lib": "sudo ln -s lib/t2s.js example/lib/t2s.js",
+    "build-sample": "docker run -it -v ${PWD}/src:/input-volume -v ${PWD}/src/../api:/output-volume $npm_package_config_compiler t2s ondewo-t2s-api ondewo-t2s-api ondewo"
+  },
+  "repository": {
+    "type": "git",
+    "directory": "https://github.com/ondewo/ondewo-t2s-client-js.git"
+  },
+  "dependencies": {
+    "google-protobuf": "^3.21.4",
+    "grpc-web": "^1.5.0",
+    "webpack": "^5.99.9"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.12.2",
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.13.0",
+    "eslint": "^9.13.0",
+    "global": "^4.4.0",
+    "husky": "^9.1.6",
+    "prettier": "^3.3.3"
+  }
 }
