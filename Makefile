@@ -14,10 +14,10 @@ export
 # 		Variables
 ########################################################
 
-ONDEWO_T2S_VERSION = 6.0.0
+ONDEWO_T2S_VERSION = 6.1.0
 
-T2S_API_GIT_BRANCH=tags/6.0.0
-ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.0.0
+T2S_API_GIT_BRANCH=tags/6.1.0
+ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.5.2
 ONDEWO_PROTO_COMPILER_DIR=ondewo-proto-compiler
 T2S_APIS_DIR=src/ondewo-t2s-api
 T2S_PROTOS_DIR=${T2S_APIS_DIR}/ondewo
