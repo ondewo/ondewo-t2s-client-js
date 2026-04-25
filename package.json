@@ -1,6 +1,6 @@
 {
 	"name": "@ondewo/ondewo-t2s-client-js",
-	"version": "6.1.0",
+	"version": "6.2.0",
 	"description": "ONDEWO Text to Speech (T2S) Client library for Js",
 	"author": "ONDEWO GmbH <office@ondewo.com>",
 	"homepage": "https://ondewo.com",
@@ -23,12 +23,12 @@
 		"webpack": "^5.99.9"
 	},
 	"devDependencies": {
-		"@eslint/eslintrc": "^3.3.1",
-		"@eslint/js": "^9.33.0",
-		"@typescript-eslint/eslint-plugin": "^8.39.0",
-		"eslint": "^9.33.0",
+		"@eslint/eslintrc": "^3.3.5",
+		"@eslint/js": "^9.39.4",
+		"@typescript-eslint/eslint-plugin": "^8.59.0",
+		"eslint": "^9.39.4",
 		"global": "^4.4.0",
 		"husky": "^9.1.7",
-		"prettier": "^3.6.2"
+		"prettier": "^3.8.3"
 	}
 }
