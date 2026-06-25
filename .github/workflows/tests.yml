@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      # The repo is ~95% generated gRPC/protobuf stubs; coverage is gated on the HAND-WRITTEN surface only
+      # (the D18 Keycloak offline-token auth provider, auth/offlineTokenProvider.js). The test runs node's
+      # built-in test runner under c8 with a 100% line/branch/function coverage gate scoped to that file.
+      - name: Unit tests + 100% coverage gate on hand-written auth code
+        run: npm test
