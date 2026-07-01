@@ -1,0 +1,55 @@
+<!doctype html>
+<!--
+  Copyright 2021-2026 ONDEWO GmbH
+  Licensed under the Apache License, Version 2.0.
+
+  Minimal browser example for the ONDEWO Text-to-Speech (T2S) grpc-web client. Loading
+  `api/ondewo_t2s_api.js` registers the global `ondewo_t2s_api` namespace used below. The request
+  building / response handling mirrors `client.js` (which is unit-tested with the gRPC layer mocked).
+
+  Auth: T2S uses a Keycloak bearer token. Bundle `auth/offlineTokenProvider.js` into your app and call
+  its `login({ keycloakUrl, realm, clientId, username, password })` to obtain a live provider, then use
+  `provider.getAuthorizationHeader()` for the `authorization` metadata below. A placeholder token is
+  shown here to keep the page self-contained.
+
+  Serve this folder (e.g. `npx http-server examples`) and open the page; the T2S server must allow the
+  origin via grpc-web (envoy).
+-->
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>ONDEWO T2S grpc-web example</title>
+	</head>
+	<body>
+		<button id="synthesize">Synthesize</button>
+		<audio id="player" controls></audio>
+
+		<script src="../api/ondewo_t2s_api.js"></script>
+		<script>
+			const T2S_HOST = 'https://t2s.example.com:443';
+			const PIPELINE_ID = 'default';
+			// Replace with `provider.getAuthorizationHeader()` from auth/offlineTokenProvider.js.
+			const AUTHORIZATION_HEADER = 'Bearer <access-token>';
+
+			const client = new ondewo_t2s_api.Text2SpeechPromiseClient(T2S_HOST);
+
+			async function synthesize(text) {
+				const request = new ondewo_t2s_api.SynthesizeRequest();
+				request.setText(text);
+				const config = new ondewo_t2s_api.RequestConfig();
+				config.setT2sPipelineId(PIPELINE_ID);
+				request.setConfig(config);
+
+				const metadata = { authorization: AUTHORIZATION_HEADER };
+				const response = await client.synthesize(request, metadata);
+
+				const audioBlob = new Blob([response.getAudio_asU8()], { type: 'audio/wav' });
+				document.getElementById('player').src = URL.createObjectURL(audioBlob);
+			}
+
+			document.getElementById('synthesize').addEventListener('click', () => {
+				synthesize('Hello from ONDEWO Text-to-Speech!').catch((error) => console.error(error));
+			});
+		</script>
+	</body>
+</html>
