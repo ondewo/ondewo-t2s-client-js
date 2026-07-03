@@ -141,10 +141,10 @@ function buildSynthesizeRequest(t2sApi, options) {
  * @param {TokenProvider} tokenProvider
  *     The live token provider whose `Authorization` header is forwarded to the server.
  * @returns {Record<string, string>}
- *     grpc-web metadata with a single `authorization: Bearer <access-token>` entry.
+ *     grpc-web metadata with a single `Authorization: Bearer <access-token>` entry.
  */
 function bearerMetadata(tokenProvider) {
-	return { authorization: tokenProvider.getAuthorizationHeader() };
+	return { Authorization: tokenProvider.getAuthorizationHeader() };
 }
 
 /**

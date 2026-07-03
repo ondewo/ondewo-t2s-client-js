@@ -147,7 +147,7 @@ runTestCase('bearerMetadata forwards the provider Authorization header as grpc-w
 
 	const metadata = bearerMetadata({ getAuthorizationHeader: () => authHeader });
 
-	assert.deepEqual(metadata, { authorization: authHeader });
+	assert.deepEqual(metadata, { Authorization: authHeader });
 });
 
 runTestCase('synthesizeText builds the request, attaches bearer metadata, and maps the response', async () => {
@@ -177,7 +177,7 @@ runTestCase('synthesizeText builds the request, attaches bearer metadata, and ma
 	assert.equal(capture.request.getText(), spokenText);
 	assert.equal(capture.request.getConfig().getT2sPipelineId(), pipelineId);
 	// ... authenticated the call with the bearer token ...
-	assert.deepEqual(capture.metadata, { authorization: authHeader });
+	assert.deepEqual(capture.metadata, { Authorization: authHeader });
 	// ... and mapped every response field into the plain summary.
 	assert.equal(result.audioUuid, 'audio-uuid-1');
 	assert.deepEqual(result.audioBytes, audioBytes);

@@ -9,7 +9,7 @@
 
   Auth: T2S uses a Keycloak bearer token. Bundle `auth/offlineTokenProvider.js` into your app and call
   its `login({ keycloakUrl, realm, clientId, username, password })` to obtain a live provider, then use
-  `provider.getAuthorizationHeader()` for the `authorization` metadata below. A placeholder token is
+  `provider.getAuthorizationHeader()` for the `Authorization` metadata below. A placeholder token is
   shown here to keep the page self-contained.
 
   Serve this folder (e.g. `npx http-server examples`) and open the page; the T2S server must allow the
@@ -40,7 +40,7 @@
 				config.setT2sPipelineId(PIPELINE_ID);
 				request.setConfig(config);
 
-				const metadata = { authorization: AUTHORIZATION_HEADER };
+				const metadata = { Authorization: AUTHORIZATION_HEADER };
 				const response = await client.synthesize(request, metadata);
 
 				const audioBlob = new Blob([response.getAudio_asU8()], { type: 'audio/wav' });
