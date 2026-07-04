@@ -25,9 +25,15 @@ export default [
 				console: true,
 				XMLHttpRequest: true,
 				uuidv4: true,
-				t2s: true
+				t2s: true,
+				module: true,
+				require: true,
+				setTimeout: true,
+				clearTimeout: true,
+				URLSearchParams: true,
+				process: true
 			},
-			ecmaVersion: 2020, // Set ECMAScript version
+			ecmaVersion: 2021, // Set ECMAScript version
 			sourceType: 'module' // If using ES modules
 		},
 		rules: {
