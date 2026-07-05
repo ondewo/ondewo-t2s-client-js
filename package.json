@@ -17,6 +17,9 @@
     "type": "git",
     "directory": "https://github.com/ondewo/ondewo-t2s-client-js.git"
   },
+  "scripts": {
+    "test": "c8 --check-coverage --lines 100 --branches 100 --functions 100 --include auth/offlineTokenProvider.js --exclude '**/*.spec.js' --reporter text -- node --test auth/offlineTokenProvider.spec.js examples/client.spec.js"
+  },
   "dependencies": {
     "google-protobuf": "^3.21.4",
     "grpc-web": "^1.5.0",
@@ -30,6 +33,7 @@
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^9.39.4",
     "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "c8": "^11.0.0",
     "eslint": "^9.39.4",
     "global": "^4.4.0",
     "husky": "^9.1.7",
