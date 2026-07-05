@@ -22,6 +22,8 @@
 const { test: runTestCase, mock } = require('node:test');
 const assert = require('node:assert/strict');
 
+const { Agent } = require('undici');
+
 const { login, OfflineTokenProvider, TokenError } = require('./offlineTokenProvider');
 
 /**
@@ -563,4 +565,76 @@ runTestCase('refresh() returns early when the provider is already stopped', asyn
 	// Directly invoking refresh() after stop() hits the `stopped` guard and performs no fetch.
 	await provider.refresh();
 	assert.equal(stub.calls.length, 1);
+});
+
+/**
+ * Asserts the SECURE default (keycloakVerifySsl omitted): the token POST carries NO insecure undici
+ * dispatcher, so the default global fetch performs TLS certificate verification -- unchanged behaviour.
+ */
+runTestCase('keycloakVerifySsl defaults to TLS verification ON (no insecure dispatcher on the request)', async () => {
+	const stub = makeFetchStub([{ body: { access_token: 'access-1', refresh_token: 'offline-1', expires_in: 300 } }]);
+	const provider = await login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl });
+	assert.equal(stub.calls[0].init.dispatcher, undefined);
+	provider.stop();
+});
+
+/**
+ * Asserts that an EXPLICIT `keycloakVerifySsl: true` behaves exactly like the default: no insecure
+ * dispatcher is attached (TLS verification stays ON).
+ */
+runTestCase('keycloakVerifySsl=true keeps TLS verification ON (no insecure dispatcher on the request)', async () => {
+	const stub = makeFetchStub([{ body: { access_token: 'access-1', refresh_token: 'offline-1', expires_in: 300 } }]);
+	const provider = await login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl, keycloakVerifySsl: true });
+	assert.equal(stub.calls[0].init.dispatcher, undefined);
+	provider.stop();
+});
+
+/**
+ * Asserts that `keycloakVerifySsl: false` wires an insecure undici `Agent` dispatcher (rejectUnauthorized
+ * off) onto the token POST init, disabling TLS certificate verification for that request only.
+ */
+runTestCase('keycloakVerifySsl=false attaches an insecure undici dispatcher to the token request', async () => {
+	const stub = makeFetchStub([{ body: { access_token: 'access-1', refresh_token: 'offline-1', expires_in: 300 } }]);
+	const provider = await login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl, keycloakVerifySsl: false });
+	assert.notEqual(stub.calls[0].init.dispatcher, undefined);
+	assert.ok(stub.calls[0].init.dispatcher instanceof Agent);
+	provider.stop();
+});
+
+/**
+ * Asserts that the verify-off flag also applies to the background refresh: the re-armed refresh POST
+ * carries the same insecure undici dispatcher as the initial login POST.
+ */
+runTestCase('keycloakVerifySsl=false also disables TLS verification on the background refresh', async () => {
+	const stub = makeFetchStub([
+		{ body: { access_token: 'access-1', refresh_token: 'offline-1', expires_in: 31 } },
+		{ body: { access_token: 'access-2', refresh_token: 'offline-2', expires_in: 31 } }
+	]);
+
+	mock.timers.enable({ apis: ['setTimeout'] });
+	try {
+		const provider = await login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl, keycloakVerifySsl: false });
+
+		mock.timers.tick(1000);
+		await flushMicrotasks();
+
+		assert.equal(stub.calls.length, 2);
+		assert.ok(stub.calls[1].init.dispatcher instanceof Agent);
+		provider.stop();
+	} finally {
+		mock.timers.reset();
+	}
+});
+
+/**
+ * Asserts Python-parity "flag ignored when a custom transport is injected": even with
+ * `keycloakVerifySsl: false`, the injected `fetchImpl` still receives the call and yields a token. The
+ * dispatcher lands on the init (a no-op for the fake fetch, which does not honour it), and login succeeds.
+ */
+runTestCase('keycloakVerifySsl=false still logs in through an injected fetchImpl (flag is a no-op there)', async () => {
+	const stub = makeFetchStub([{ body: { access_token: 'access-1', refresh_token: 'offline-1', expires_in: 300 } }]);
+	const provider = await login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl, keycloakVerifySsl: false });
+	assert.equal(stub.calls.length, 1);
+	assert.equal(provider.getAccessToken(), 'access-1');
+	provider.stop();
 });

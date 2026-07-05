@@ -102,6 +102,33 @@ function buildTokenEndpoint(keycloakUrl, realm) {
 }
 
 /**
+ * Lazily-created, cached undici `Agent` that skips TLS certificate verification. Built only when the
+ * insecure code path is first taken (`keycloakVerifySsl === false`), so `undici` is never required in the
+ * common secure path.
+ *
+ * @type {object | null}
+ */
+let insecureDispatcher = null;
+
+/**
+ * Return a cached undici dispatcher (`Agent`) configured with `rejectUnauthorized: false`, lazily
+ * requiring `undici` on first use. Attached to the token request's `init.dispatcher` so the real global
+ * fetch performs the TLS handshake without certificate verification. Scoped to the token request only, so
+ * it does not weaken the separate gRPC-web TLS.
+ *
+ * @returns {object}
+ *     The insecure undici `Agent` dispatcher.
+ */
+function getInsecureDispatcher() {
+	if (insecureDispatcher === null) {
+		// eslint-disable-next-line global-require
+		const { Agent } = require('undici');
+		insecureDispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+	}
+	return insecureDispatcher;
+}
+
+/**
  * POST an `application/x-www-form-urlencoded` body to the token endpoint and return the parsed JSON.
  * Raises TokenError on a non-2xx response or unparseable / access_token-less body.
  *
@@ -111,21 +138,30 @@ function buildTokenEndpoint(keycloakUrl, realm) {
  *     The form fields to URL-encode into the request body (e.g. `grant_type`, `client_id`).
  * @param {FetchImpl} fetchImpl
  *     The `fetch`-compatible function used to issue the request.
+ * @param {boolean} verifySsl
+ *     When `false`, attach an insecure undici dispatcher (`rejectUnauthorized: false`) to the request so
+ *     the default global fetch skips TLS certificate verification. Only honoured by the real global fetch;
+ *     an injected `fetchImpl` ignores it.
  * @returns {Promise<TokenResponse>}
  *     The parsed token-endpoint response, guaranteed to carry a non-empty `access_token`.
  * @throws {TokenError}
  *     On a non-2xx response, an unparseable body, or a body lacking an `access_token`.
  */
-async function postTokenRequest(tokenEndpoint, params, fetchImpl) {
+async function postTokenRequest(tokenEndpoint, params, fetchImpl, verifySsl) {
 	const body = new URLSearchParams(params).toString();
-	const response = await fetchImpl(tokenEndpoint, {
+	/** @type {object} */
+	const init = {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/x-www-form-urlencoded',
 			Accept: 'application/json'
 		},
 		body
-	});
+	};
+	if (verifySsl === false) {
+		init.dispatcher = getInsecureDispatcher();
+	}
+	const response = await fetchImpl(tokenEndpoint, init);
 	const text = await response.text();
 	if (!response.ok) {
 		throw new TokenError(`Keycloak token endpoint returned HTTP ${response.status}: ${text}`);
@@ -161,6 +197,12 @@ async function postTokenRequest(tokenEndpoint, params, fetchImpl) {
  *     Optional `fetch` override; defaults to `globalThis.fetch`.
  * @property {() => number} [nowInMs]
  *     Optional clock returning epoch milliseconds; defaults to `Date.now`.
+ * @property {boolean} [keycloakVerifySsl]
+ *     TLS certificate verification for the Keycloak token-endpoint call; defaults to `true` (secure).
+ *     Set `false` only for a self-signed local Envoy (e.g. `https://localhost:12001/auth`). Node-only:
+ *     when `false`, an undici dispatcher with `rejectUnauthorized: false` is attached to the token
+ *     request. No-op when a custom `fetchImpl` is injected (the dispatcher is only honoured by the real
+ *     global fetch).
  */
 
 /**
@@ -199,6 +241,11 @@ class OfflineTokenProvider {
 		 * @type {() => number}
 		 */
 		this.nowInMs = options.nowInMs !== undefined ? options.nowInMs : Date.now;
+		/**
+		 * Whether to verify the Keycloak TLS certificate on the token call (secure default).
+		 * @type {boolean}
+		 */
+		this.verifySsl = options.keycloakVerifySsl !== false;
 		/**
 		 * The current short-lived access token, or null before bootstrap / after the loop has lapsed.
 		 * @type {string | null}
@@ -253,7 +300,8 @@ class OfflineTokenProvider {
 				password,
 				scope: 'offline_access'
 			},
-			this.fetchImpl
+			this.fetchImpl,
+			this.verifySsl
 		);
 		this.accessToken = tokenResponse.access_token;
 		this.refreshToken = typeof tokenResponse.refresh_token === 'string' ? tokenResponse.refresh_token : null;
@@ -298,7 +346,8 @@ class OfflineTokenProvider {
 				// Non-null here: refresh() only runs after bootstrap() stored an offline refresh token.
 				refresh_token: /** @type {string} */ (this.refreshToken)
 			},
-			this.fetchImpl
+			this.fetchImpl,
+			this.verifySsl
 		);
 		this.accessToken = tokenResponse.access_token;
 		// Keycloak may rotate the offline refresh token; keep the newest one when present.

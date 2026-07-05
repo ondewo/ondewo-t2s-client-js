@@ -21,6 +21,7 @@
     "google-protobuf": "^3.21.4",
     "grpc-web": "^1.5.0",
     "terser-webpack-plugin": "^5.3.14",
+    "undici": "^6.27.0",
     "webpack": "^5.99.9",
     "webpack-cli": "^6.0.1",
     "webpack-merge": "^6.0.1"
