@@ -42,7 +42,8 @@ export default [
 				setTimeout: true,
 				clearTimeout: true,
 				URLSearchParams: true,
-				process: true
+				process: true,
+				__dirname: true
 			},
 			ecmaVersion: 2021, // Set ECMAScript version
 			sourceType: 'module' // If using ES modules

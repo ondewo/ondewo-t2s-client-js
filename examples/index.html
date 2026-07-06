@@ -12,6 +12,10 @@
   `provider.getAuthorizationHeader()` for the `Authorization` metadata below. A placeholder token is
   shown here to keep the page self-contained.
 
+  Config: this is browser code, so it cannot read `examples/environment.env` (that dotenv file drives
+  the Node example `client.js`). The placeholders below map 1:1 to the canonical env vars used across
+  the SDK examples: T2S_HOST -> ONDEWO_HOST + ONDEWO_PORT, PIPELINE_ID -> ONDEWO_T2S_PIPELINE_ID.
+
   Serve this folder (e.g. `npx http-server examples`) and open the page; the T2S server must allow the
   origin via grpc-web (envoy).
 -->
@@ -34,6 +38,7 @@
 			const client = new ondewo_t2s_api.Text2SpeechPromiseClient(T2S_HOST);
 
 			async function synthesize(text) {
+				console.log('Requesting Synthesize on pipeline', PIPELINE_ID, 'at', T2S_HOST);
 				const request = new ondewo_t2s_api.SynthesizeRequest();
 				request.setText(text);
 				const config = new ondewo_t2s_api.RequestConfig();
@@ -45,10 +50,13 @@
 
 				const audioBlob = new Blob([response.getAudio_asU8()], { type: 'audio/wav' });
 				document.getElementById('player').src = URL.createObjectURL(audioBlob);
+				console.log('Synthesized audio', response.getAudioUuid(), `${audioBlob.size} bytes`);
 			}
 
 			document.getElementById('synthesize').addEventListener('click', () => {
-				synthesize('Hello from ONDEWO Text-to-Speech!').catch((error) => console.error(error));
+				synthesize('Hello from ONDEWO Text-to-Speech!').catch((error) => {
+					console.error('T2S synthesize failed:', error);
+				});
 			});
 		</script>
 	</body>

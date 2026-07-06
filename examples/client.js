@@ -24,7 +24,41 @@
 
 'use strict';
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, 'environment.env') });
+
 const { login } = require('../auth/offlineTokenProvider');
+
+/**
+ * Read a required environment variable, throwing a descriptive error when it is missing or empty so a
+ * misconfigured `examples/environment.env` fails fast with actionable context instead of a cryptic RPC
+ * error later on.
+ *
+ * @param {string} name
+ *     The canonical environment variable name (see `examples/environment.env`).
+ * @returns {string}
+ *     The trimmed value of the variable.
+ */
+function requireEnv(name) {
+	const value = process.env[name];
+	if (typeof value !== 'string' || value.trim().length === 0) {
+		throw new Error(`Missing required environment variable "${name}" (set it in examples/environment.env)`);
+	}
+	return value.trim();
+}
+
+/**
+ * Build the gRPC-web endpoint URL from the canonical connection env vars.
+ *
+ * @returns {string}
+ *     The `http(s)://host:port` endpoint the Text2Speech client connects to.
+ */
+function buildEndpoint() {
+	const host = requireEnv('ONDEWO_HOST');
+	const port = requireEnv('ONDEWO_PORT');
+	const scheme = process.env.ONDEWO_USE_SECURE_CHANNEL === 'false' ? 'http' : 'https';
+	return `${scheme}://${host}:${port}`;
+}
 
 /**
  * The grpc-web message/client namespace registered by `api/ondewo_t2s_api.js`. Only the members this
@@ -177,32 +211,52 @@ async function synthesizeText(t2sApi, client, tokenProvider, options) {
  * Reference wiring: authenticate, construct the client and synthesize one utterance.
  *
  * In a browser, load `api/ondewo_t2s_api.js` via a `<script>` tag first (see `index.html`); it
- * registers the `ondewo_t2s_api` global read here. Replace the placeholder Keycloak / host / pipeline
- * values with your deployment's. Not executed by the test suite -- it reaches a live server.
+ * registers the `ondewo_t2s_api` global read here. All connection / Keycloak / pipeline values are
+ * read from `examples/environment.env` (see the canonical variable names there). Not executed by the
+ * test suite -- it reaches a live server.
  *
  * @returns {Promise<void>}
  *     Resolves once the utterance has been synthesized and the token provider stopped.
  */
 async function main() {
+	const endpoint = buildEndpoint();
+	console.log(`START: synthesizing on T2S endpoint ${endpoint}`);
+
 	/** @type {T2sApi} */
 	const t2sApi = /** @type {any} */ (globalThis).ondewo_t2s_api;
-	const client = new t2sApi.Text2SpeechPromiseClient('https://t2s.example.com:443');
+	const client = new t2sApi.Text2SpeechPromiseClient(endpoint);
+
+	console.log(
+		`Authenticating with Keycloak at ${requireEnv('KEYCLOAK_URL')} (realm "${requireEnv('KEYCLOAK_REALM')}")`
+	);
 	const tokenProvider = await login({
-		keycloakUrl: 'https://auth.example.com/auth',
-		realm: 'ondewo-ccai-platform',
-		clientId: 'ondewo-nlu-cai-sdk-public',
-		username: 'tech-user@example.com',
-		password: 'super-secret'
+		keycloakUrl: requireEnv('KEYCLOAK_URL'),
+		realm: requireEnv('KEYCLOAK_REALM'),
+		clientId: requireEnv('KEYCLOAK_CLIENT_ID'),
+		username: requireEnv('KEYCLOAK_USER_NAME'),
+		password: requireEnv('KEYCLOAK_PASSWORD'),
+		keycloakVerifySsl: process.env.KEYCLOAK_VERIFY_SSL !== 'false'
 	});
 	try {
-		const result = await synthesizeText(t2sApi, client, tokenProvider, {
-			text: 'Hello from ONDEWO Text-to-Speech!',
-			pipelineId: 'default'
-		});
-		console.log('Synthesized audio', result.audioUuid, `${result.audioLength}s`, `${result.audioBytes.length} bytes`);
+		const pipelineId = requireEnv('ONDEWO_T2S_PIPELINE_ID');
+		const text = requireEnv('ONDEWO_T2S_TEXT');
+		console.log(`Requesting Synthesize on pipeline "${pipelineId}"`);
+		const result = await synthesizeText(t2sApi, client, tokenProvider, { text, pipelineId });
+		console.log(
+			`DONE: synthesized audio ${result.audioUuid} (${result.audioLength}s, ${result.audioBytes.length} bytes)`
+		);
 	} finally {
 		tokenProvider.stop();
 	}
 }
 
-module.exports = { buildSynthesizeRequest, bearerMetadata, synthesizeText, main };
+module.exports = { buildSynthesizeRequest, bearerMetadata, synthesizeText, buildEndpoint, requireEnv, main };
+
+// Reference entrypoint: run `node examples/client.js` against a live T2S deployment configured via
+// `examples/environment.env`. Not reached by the unit tests (which import the helpers above).
+if (require.main === module) {
+	main().catch((error) => {
+		console.error('FAILED: T2S synthesize example errored:', error);
+		process.exit(1);
+	});
+}
