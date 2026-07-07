@@ -16,13 +16,13 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "initialize": "git submodule update --init --recursive --remote",
-    "build": "docker run -it -v ${PWD}:/input-volume -v ${PWD}/../api:/output-volume ondewo-js-proto-compiler ondewo-t2s-api ondewo-t2s-api ondewo",
-    "debug": "docker run -it --entrypoint /bin/bash -v ${PWD}/src:/input-volume -v ${PWD}/src/..:/output-volume $npm_package_config_compiler",
+    "build": "docker run -v ${PWD}:/input-volume -v ${PWD}/../api:/output-volume ondewo-js-proto-compiler ondewo-t2s-api ondewo-t2s-api ondewo",
+    "debug": "docker run --entrypoint /bin/bash -v ${PWD}/src:/input-volume -v ${PWD}/src/..:/output-volume $npm_package_config_compiler",
     "publish-npm": "npm publish ../npm --access public",
     "build-update": "npm run build-only && npm run start-example",
     "start-example": "sudo cp lib/t2s.js example/lib/t2s.js && http-server example",
     "example-link-lib": "sudo ln -s lib/t2s.js example/lib/t2s.js",
-    "build-sample": "docker run -it -v ${PWD}/src:/input-volume -v ${PWD}/src/../api:/output-volume $npm_package_config_compiler t2s ondewo-t2s-api ondewo-t2s-api ondewo"
+    "build-sample": "docker run -v ${PWD}/src:/input-volume -v ${PWD}/src/../api:/output-volume $npm_package_config_compiler t2s ondewo-t2s-api ondewo-t2s-api ondewo"
   },
   "repository": {
     "type": "git",
