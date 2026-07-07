@@ -52,10 +52,36 @@ npm
 │   ├── ondewo_t2s_api.js
 │   ├── ondewo_t2s_api.min.js
 │   └── ondewo_t2s_api.min.js.map
+├── auth
+│   ├── offlineTokenProvider.js
+│   └── offlineTokenProvider.spec.js
 ├── LICENSE
 ├── package.json
 └── README.md
 ```
+
+## Authentication
+
+Calls to the ONDEWO API are authenticated with a Keycloak bearer token. Bundle `auth/offlineTokenProvider.js` into your app, call `login()` to obtain a live token provider, then pass its `Authorization` header as gRPC-web metadata on every request:
+
+```js
+const { login } = require('@ondewo/ondewo-t2s-client-js/auth/offlineTokenProvider');
+
+const tokenProvider = await login({
+  keycloakUrl: 'https://auth.example.com/auth',
+  realm: 'ondewo-ccai-platform',
+  clientId: 'ondewo-nlu-cai-sdk-public',
+  username: 'tech-user@example.com',
+  password: 'super-secret'
+});
+
+// Pass this metadata to any T2S RPC, e.g. client.synthesize(request, metadata):
+const metadata = { Authorization: tokenProvider.getAuthorizationHeader() }; // "Bearer <jwt>"
+
+tokenProvider.stop(); // stop the background refresh loop when done
+```
+
+`login()` performs a one-time password login and then refreshes the short-lived access token in the background, so `getAuthorizationHeader()` always returns a valid `Bearer <jwt>` value. Use the canonical `Authorization` header casing. See `examples/client.js` and `examples/index.html` for a complete, runnable example.
 
 [comment]: <> (START OF GITHUB README)
 

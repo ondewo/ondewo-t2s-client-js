@@ -31,7 +31,10 @@
   "dependencies": {
     "google-protobuf": "^3.21.4",
     "grpc-web": "^1.5.0",
-    "webpack": "^5.99.9"
+    "webpack": "^5.99.9",
+    "terser-webpack-plugin": "^5.3.14",
+    "webpack-cli": "^6.0.1",
+    "webpack-merge": "^6.0.1"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.12.2",
