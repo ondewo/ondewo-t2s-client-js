@@ -249,4 +249,4 @@ npm_run_build: ## Runs the build command in package.json
 	@echo "DONE npm run build."
 
 restore_ci_test_setup: ## Re-add CI test scripts + devDeps (from .ci-package.json) stripped by the proto-compiler regen
-	@node restore-ci-package.js
+	@node -e 'const fs=require("fs");if(!fs.existsSync(".ci-package.json")){console.log("no .ci-package.json, skipping");process.exit(0)}const p=JSON.parse(fs.readFileSync("package.json","utf8"));const c=JSON.parse(fs.readFileSync(".ci-package.json","utf8"));p.scripts=Object.assign({},p.scripts||{},c.scripts||{});p.devDependencies=Object.assign({},p.devDependencies||{},c.devDependencies||{});if(c.description)p.description=c.description;fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n");console.log("restore-ci-package: merged CI test setup; scripts=["+Object.keys(p.scripts).join(",")+"]")'
