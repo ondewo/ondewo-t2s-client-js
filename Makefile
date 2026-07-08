@@ -130,7 +130,7 @@ create_release_tag: ## Create Release Tag and push it to origin
 	git push origin ${ONDEWO_T2S_VERSION}
 
 login_to_gh: ## Login to Github CLI with Access Token
-	echo $(GITHUB_GH_TOKEN) | gh auth login -p ssh --with-token
+	@echo $(GITHUB_GH_TOKEN) | gh auth login -p ssh --with-token
 
 build_gh_release: ## Generate Github Release with CLI
 	gh release create --repo $(GH_REPO) "$(ONDEWO_T2S_VERSION)" -n "$(CURRENT_RELEASE_NOTES)" -t "Release ${ONDEWO_T2S_VERSION}"
@@ -145,7 +145,7 @@ build_compiler: ## Builds Ondewo-Proto-Compiler
 	cd ondewo-proto-compiler/js && sh build.sh
 
 release_to_github_via_docker_image: ## Release to Github via docker
-	docker run --rm \
+	@docker run --rm \
 		-e GITHUB_GH_TOKEN=${GITHUB_GH_TOKEN} \
 		${IMAGE_UTILS_NAME} make push_to_gh
 
@@ -153,7 +153,7 @@ build_utils_docker_image: ## Build utils docker image
 	docker build -f Dockerfile.utils -t ${IMAGE_UTILS_NAME} .
 
 publish_npm_via_docker: build_utils_docker_image ## Builds Code, Docker-Image and Releases to NPM
-	docker run --rm \
+	@docker run --rm \
 		-e NPM_AUTOMATION_TOKEN=${NPM_AUTOMATION_TOKEN} \
 		${IMAGE_UTILS_NAME} make docker_npm_release
 
