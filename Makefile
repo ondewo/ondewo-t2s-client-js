@@ -47,6 +47,7 @@ install_packages: ## Install npm packages
 
 install_precommit_hooks: ## Install precommit hooks
 	npx husky install
+	uv tool install pre-commit || pipx install pre-commit || pip install --user pre-commit
 
 run_precommit_hooks: ## Runs all precommit hooks
 	.husky/pre-commit

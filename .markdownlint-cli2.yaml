@@ -1,0 +1,36 @@
+# Auto-fix the mechanical rules (blank-line spacing, list indentation, emphasis
+# style, ...) the same way ruff-format does for Python.
+fix: true
+config:
+  # MD013 line-length: docs contain long lines / tables.
+  MD013: false
+  # MD033 no-inline-html: docs embed <p>/<code> HTML tags.
+  MD033: false
+  # MD024 duplicate-heading: changelogs repeat "### Improvements" / "### Breaking
+  # Changes" under each release section; allow when not direct siblings.
+  MD024:
+    siblings_only: true
+  # MD040 fenced-code-language: README embeds plain directory-tree / output blocks.
+  MD040: false
+  # MD041 first-line-heading: README opens with the HTML branding/logo header.
+  MD041: false
+  # MD045 image-alt-text: the branding header uses <img> logos / social icons.
+  MD045: false
+  # MD053 link-reference-definitions: the READMEs embed intentional
+  # '[comment]: <> (START/END OF GITHUB README)' marker definitions that the
+  # release Makefile (perl range on 'START OF GITHUB README'..'END OF GITHUB
+  # README') uses to extract the published README section. They look "unused"
+  # to markdownlint but are load-bearing, so never strip them.
+  MD053: false
+globs:
+  - "*.md"
+ignores:
+  - "node_modules/**"
+  - "api/**"
+  - "src/ondewo-t2s-api/**"
+  - "ondewo-proto-compiler/**"
+  - "lib/**"
+  - "dist/**"
+  - "build/**"
+  - "coverage/**"
+  - ".venv/**"

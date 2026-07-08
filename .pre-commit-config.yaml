@@ -1,0 +1,49 @@
+#############################################################################################
+# pre-commit — language-agnostic hooks for non-python repos (js/ts/nodejs/angular clients,  #
+# APIs, proto-compiler). Language-specific linting/formatting stays with the repo's own      #
+# toolchain (eslint/prettier via husky, buf, etc.). Ruff/mypy/uv are python-only and NOT     #
+# included here.                                                                             #
+#############################################################################################
+
+# Never touch generated / vendored code. Excluded here: node_modules/lib/dist/build/coverage,
+# the generated proto bundle (api/), *_pb.js/*_grpc_pb.js/*_pb2* stubs, the git submodules
+# (src/ondewo-t2s-api, ondewo-proto-compiler) and package-lock.json.
+exclude: '(^|/)(node_modules|lib|dist|build|coverage|\.venv)/|(_pb\.(js|d\.ts)$|_pb2\.pyi?$|_pb2_grpc\.py$|_grpc_pb\.(js|d\.ts)$)|^(api|src/ondewo-.*-api|ondewo-.*-api|ondewo-proto-compiler)(/|$)|^package-lock\.json$'
+
+fail_fast: false
+
+repos:
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.23.0
+    hooks:
+      - id: markdownlint-cli2
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [ maxkb=1024 ]
+      - id: check-json          # validate (does NOT reformat) json/package.json
+      - id: check-yaml
+      - id: check-xml
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: detect-private-key
+      - id: check-executables-have-shebangs
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: https://github.com/milin/giticket
+    rev: '1.92'
+    hooks:
+      - id: giticket
+        args: [ '--regex=(?:(?:feature|bugfix|support|hotfix)/)?(OND[0-9]{3}-[0-9]{1,5})[_-][\w-]+',
+                '--format=[{ticket}] {commit_msg}',
+                '--mode=regex_match' ]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [ commit-msg ]
