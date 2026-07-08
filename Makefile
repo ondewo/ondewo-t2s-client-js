@@ -176,7 +176,7 @@ clone_devops_accounts: ## Clones devops-accounts repo
 
 run_release_with_devops: ## Runs the make release target with credentials from devops-accounts
 	$(eval info:= $(shell cat ${DEVOPS_ACCOUNT_DIR}/account_github.env | grep GITHUB_GH & cat ${DEVOPS_ACCOUNT_DIR}/account_npm.env | grep NPM_AUTOMATION_TOKEN ))
-	make release $(info)
+	@make release $(info)
 
 spc: ## Checks if the Release Branch, Tag and Pypi version already exist
 	$(eval filtered_branches:= $(shell git branch --all | grep "release/${ONDEWO_T2S_VERSION}"))
