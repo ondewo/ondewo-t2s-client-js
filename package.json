@@ -34,7 +34,8 @@
     "terser-webpack-plugin": "^5.3.14",
     "webpack": "^5.99.9",
     "webpack-cli": "^6.0.1",
-    "webpack-merge": "^6.0.1"
+    "webpack-merge": "^6.0.1",
+    "undici": "^6.27.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
@@ -44,6 +45,7 @@
     "eslint": "^9.39.4",
     "global": "^4.4.0",
     "husky": "^9.1.7",
-    "prettier": "^3.9.4"
+    "prettier": "^3.9.4",
+    "dotenv": "^16.4.5"
   }
 }
