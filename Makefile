@@ -14,10 +14,10 @@ export
 # 		Variables
 ########################################################
 
-ONDEWO_T2S_VERSION = 6.2.0
+ONDEWO_T2S_VERSION = 6.4.0
 
-T2S_API_GIT_BRANCH=OND211-2418-add-keycloak-for-2-fa
-ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.10.0
+T2S_API_GIT_BRANCH=tags/6.4.0
+ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.11.0
 ONDEWO_PROTO_COMPILER_DIR=ondewo-proto-compiler
 T2S_APIS_DIR=src/ondewo-t2s-api
 T2S_PROTOS_DIR=${T2S_APIS_DIR}/ondewo
