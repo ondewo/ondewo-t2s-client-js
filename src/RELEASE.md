@@ -1,6 +1,13 @@
 # Release History
 
 ***************** 
+## Release ONDEWO T2S Js Client 6.4.2 
+ 
+### Improvements 
+ * Tracking API Version [6.4.2](https://github.com/ondewo/ondewo-t2s-api/releases/tag/6.4.2) ( [Documentation](https://ondewo.github.io/ondewo-t2s-api/) ) 
+
+
+***************** 
 ## Release ONDEWO T2S Js Client 6.4.1 
  
 ### Improvements 
