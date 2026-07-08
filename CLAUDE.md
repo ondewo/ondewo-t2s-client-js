@@ -102,3 +102,13 @@ These bit us during the 6.14.0 release. Keep them in mind when releasing.
 - The release auto-pulls the **latest** `ondewo-proto-compiler` tag.
 - **npm package names are inconsistent** — e.g. the JS client publishes as `@ondewo/ondewo-nlu-client-js` (double `ondewo`), not `@ondewo/nlu-client-js`. Check `src/package.json`'s `name` before querying npm.
 - **`generate` must not use `docker run -it`** — it fails in the non-interactive release (`cannot attach stdin to a TTY`). Use plain `docker run`; keep `-it` only on interactive `--entrypoint /bin/bash` debug commands.
+
+## The release regenerates root package.json — CI test scripts are preserved via `.ci-package.json`
+
+The proto-compiler codegen (`cd src && npm run build`, whose output-volume is the **repo root**) regenerates the ROOT `package.json` on every release, overwriting the CI test scripts with codegen scripts and stripping test devDeps. This silently broke CI after every release. The durable fix, present in this repo:
+
+- **`.ci-package.json`** holds the CI test scripts + test-only devDeps (immune to the codegen).
+- **`make restore_ci_test_setup`** runs inside `build` *before* `create_npm_package` and merges `.ci-package.json` back into the regenerated root `package.json`. It is an **inline `node -e`** on purpose — a helper `.js` file gets caught by the release's type-checked eslint (`no-require-imports`/`typedef`) and fails the release.
+- **`remove_npm_script`** strips scripts from the `npm/` *copy* (never the repo root) and is guarded against a missing `npm/` dir + empty scripts block (previously crashed with Error 255 when `create_npm_package` had not run yet).
+- **Runtime deps the shipped auth helper needs (e.g. `undici`) must be declared in `src/package.json`** (the codegen source of truth) — otherwise the codegen strips them from root and the published package is missing them.
+- The `generate` script uses `docker run` **without `-it`** (a TTY-enabled container breaks the non-interactive release).
