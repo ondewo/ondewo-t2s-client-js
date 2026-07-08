@@ -13,25 +13,19 @@
     "js",
     "grpc"
   ],
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "initialize": "git submodule update --init --recursive --remote",
-    "build": "docker run -v ${PWD}:/input-volume -v ${PWD}/../api:/output-volume ondewo-js-proto-compiler ondewo-t2s-api ondewo-t2s-api ondewo",
-    "debug": "docker run --entrypoint /bin/bash -v ${PWD}/src:/input-volume -v ${PWD}/src/..:/output-volume $npm_package_config_compiler",
-    "publish-npm": "npm publish ../npm --access public",
-    "build-update": "npm run build-only && npm run start-example",
-    "start-example": "sudo cp lib/t2s.js example/lib/t2s.js && http-server example",
-    "example-link-lib": "sudo ln -s lib/t2s.js example/lib/t2s.js",
-    "build-sample": "docker run -v ${PWD}/src:/input-volume -v ${PWD}/src/../api:/output-volume $npm_package_config_compiler t2s ondewo-t2s-api ondewo-t2s-api ondewo"
-  },
   "repository": {
     "type": "git",
     "directory": "https://github.com/ondewo/ondewo-t2s-client-js.git"
   },
+  "scripts": {
+    "test": "c8 --check-coverage --lines 100 --branches 100 --functions 100 --include auth/offlineTokenProvider.js --exclude '**/*.spec.js' --reporter text -- node --test auth/offlineTokenProvider.spec.js examples/client.spec.js"
+  },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "google-protobuf": "^3.21.4",
     "grpc-web": "^1.5.0",
     "terser-webpack-plugin": "^5.3.14",
+    "undici": "^6.27.0",
     "webpack": "^5.99.9",
     "webpack-cli": "^6.0.1",
     "webpack-merge": "^6.0.1"
@@ -39,7 +33,8 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^9.39.4",
-    "@typescript-eslint/eslint-plugin": "^8.63.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "c8": "^11.0.0",
     "eslint": "^9.39.4",
     "global": "^4.4.0",
     "husky": "^9.1.7",
