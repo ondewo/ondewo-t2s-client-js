@@ -1,0 +1,9 @@
+{
+  "description": "ONDEWO Text to Speech (T2S) Client library for Js",
+  "scripts": {
+    "test": "c8 --check-coverage --lines 100 --branches 100 --functions 100 --include auth/offlineTokenProvider.js --exclude '**/*.spec.js' --reporter text -- node --test auth/offlineTokenProvider.spec.js examples/client.spec.js"
+  },
+  "devDependencies": {
+    "c8": "^11.0.0"
+  }
+}
