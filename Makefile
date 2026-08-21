@@ -28,7 +28,7 @@ IMAGE_UTILS_NAME=ondewo-t2s-client-utils-js:${ONDEWO_T2S_VERSION}
 PRETTIER_WRITE?=
 
 CURRENT_RELEASE_NOTES=`cat RELEASE.md \
-	| perl -ne 'print if /Release ONDEWO T2S Js Client ${ONDEWO_T2S_VERSION}/../\*\*/'`
+	| perl -ne 'print if /Release ONDEWO T2S Js Client ${ONDEWO_T2S_VERSION}/../^\*{5}/'`
 
 GH_REPO="https://github.com/ondewo/ondewo-t2s-client-js"
 DEVOPS_ACCOUNT_GIT="ondewo-devops-accounts"
