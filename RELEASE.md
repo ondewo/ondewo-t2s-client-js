@@ -2,6 +2,17 @@
 
 *****************
 
+## Release ONDEWO T2S Js Client 6.6.2
+
+### Bug Fixes
+
+* Auth: `login()` now rejects a Keycloak token response whose `refresh_token` is present but empty, instead of arming a refresh loop that can never succeed. The insecure-TLS escape hatch is pinned to a single frozen `rejectUnauthorized: false` agent option set.
+* Release: the published npm tarball no longer ships `auth/*.spec.js`. `create_npm_package` strips test files from the `npm/` copy and writes an `npm/.npmignore` -- the repo-root `.npmignore` is never consulted, because `npm_release` publishes `./npm`. The release `git commit` also tolerates a build that produced nothing to stage.
+* Tooling: `ondewo-proto-compiler` is pinned to [5.14.0](https://github.com/ondewo/ondewo-proto-compiler/releases/tag/5.14.0) in **both** the submodule gitlink and `ONDEWO_PROTO_COMPILER_GIT_BRANCH`, so `make check_out_correct_submodule_versions` can no longer silently downgrade the submodule. This is a pin-only bump: no generated code was regenerated.
+* CI: `npm test` now gates the whole hand-written surface (`auth/`, `examples/`) at 100% statements, branches, functions and lines with `--all --per-file`, and the new `npm run test:drift` fails the build when `package.json` and `.ci-package.json` disagree.
+
+*****************
+
 ## Release ONDEWO T2S Js Client 6.6.1
 
 ### Bug Fixes
