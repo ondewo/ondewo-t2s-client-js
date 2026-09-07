@@ -46,6 +46,9 @@ make setup_developer_environment_locally                     ## Install dependen
 
 ## Package structure
 
+The published tarball is the `npm/` folder built by `make create_npm_package` -- test specs are stripped
+from it, so `auth/` ships the provider only:
+
 ```
 npm
 ├── api
@@ -53,8 +56,8 @@ npm
 │   ├── ondewo_t2s_api.min.js
 │   └── ondewo_t2s_api.min.js.map
 ├── auth
-│   ├── offlineTokenProvider.js
-│   └── offlineTokenProvider.spec.js
+│   └── offlineTokenProvider.js
+├── .npmignore
 ├── LICENSE
 ├── package.json
 └── README.md

@@ -87,37 +87,206 @@ clarifying questions come before implementation rather than after mistakes.
 - Follow existing patterns before introducing new abstractions.
 - Keep changes minimal and consistent with surrounding code.
 - Validate inputs early with descriptive, context-rich error messages.
-- Use context managers for files, sockets, and thread pools.
 - Prefer region comments for grouping methods in files that already use them.
 - End edited Markdown and YAML files with a trailing newline.
 
-## Release gotchas (hard-won this session)
+## What this repo is
 
-These bit us during the 6.14.0 release. Keep them in mind when releasing.
+A **plain-JS gRPC-web SDK** for the ONDEWO Text-to-Speech API. There is no Python, no `pyproject.toml`,
+no Jenkinsfile.
 
-- **Trust the registry, not the log.** `make release_all_clients` wraps each client in `|| echo "Already released …"`, so a _failed_ release is reported as "done". After any release, verify the GitHub release **and** the published package (PyPI / npm) directly.
-- **`npm install failed after 5 attempts` in a release log is usually a red herring** — that text is the echo _inside_ the docker `RUN for i in 1..5; do npm install …` retry loop, not a real failure (`npm install` succeeds → `#10 DONE`). Look further down for the real error (a TTY error, an eslint failure, a `setup.py` error).
-- **Codegen must run TTY-free.** The `docker run` that invokes the proto-compiler must not pass `-it` — non-interactively it fails with `cannot attach stdin to a TTY-enabled container because stdin is not a terminal`. Fix the script (drop `-it`), or run the whole release under a pseudo-TTY: `script -qc 'make …' /dev/null`.
-- **Release Makefiles print secrets.** Some `docker run … -e <TOKEN>=…` recipe lines lack a leading `@`, so `make` echoes the expanded token. Rotate any token printed during a release; fix by prefixing the recipe line with `@`.
-- The release auto-pulls the **latest** `ondewo-proto-compiler` tag.
-- **npm package names are inconsistent** — e.g. the JS client publishes as `@ondewo/ondewo-nlu-client-js` (double `ondewo`), not `@ondewo/nlu-client-js`. Check `src/package.json`'s `name` before querying npm.
-- **`generate` must not use `docker run -it`** — it fails in the non-interactive release (`cannot attach stdin to a TTY`). Use plain `docker run`; keep `-it` only on interactive `--entrypoint /bin/bash` debug commands.
+| Path | Written by | Edited by hand? |
+| --- | --- | --- |
+| `api/ondewo_t2s_api{,.min}.js{,.map}` | proto-compiler codegen (`make build`) | **never** |
+| `src/ondewo-t2s-api/` | git submodule (`tags/6.6.0`, `T2S_API_GIT_BRANCH`) | never |
+| `ondewo-proto-compiler/` | git submodule | never (only the gitlink moves) |
+| `auth/offlineTokenProvider.js` (+ `.spec.js`) | humans | **yes** |
+| `examples/client.js` (+ `.spec.js`) | humans | **yes** |
+| `src/package.json`, `src/README.md`, `src/RELEASE.md` | humans | **yes** -- these are the codegen's sources |
 
-## The release regenerates root package.json — CI test scripts are preserved via `.ci-package.json`
+`make build` copies `src/{package.json,README.md,RELEASE.md}` over the ROOT copies, so **edit both** or the
+next release silently reverts the root file. They are byte-identical today.
 
-The proto-compiler codegen (`cd src && npm run build`, whose output-volume is the **repo root**) regenerates the ROOT `package.json` on every release, overwriting the CI test scripts with codegen scripts and stripping test devDeps. This silently broke CI after every release. The durable fix, present in this repo:
+`auth/` and `examples/` are the entire hand-written surface; the coverage gate is scoped to exactly those
+two directories.
 
-- **`.ci-package.json`** holds the CI test scripts + test-only devDeps (immune to the codegen).
-- **`make restore_ci_test_setup`** runs inside `build` _before_ `create_npm_package` and merges `.ci-package.json` back into the regenerated root `package.json`. It is an **inline `node -e`** on purpose — a helper `.js` file gets caught by the release's type-checked eslint (`no-require-imports`/`typedef`) and fails the release.
-- **`remove_npm_script`** strips scripts from the `npm/` _copy_ (never the repo root) and is guarded against a missing `npm/` dir + empty scripts block (previously crashed with Error 255 when `create_npm_package` had not run yet).
-- **Runtime deps the shipped auth helper needs (e.g. `undici`) must be declared in `src/package.json`** (the codegen source of truth) — otherwise the codegen strips them from root and the published package is missing them.
-- The `generate` script uses `docker run` **without `-it`** (a TTY-enabled container breaks the non-interactive release).
+## Tests and the coverage gate
 
-## Pre-commit (chained into husky) + the release gotchas
+```shell
+npm install --no-audit --no-fund   # what CI runs; package-lock.json is committed
+npm test                           # every spec in ONE c8 process, 100% gate
+npm run test:drift                 # package.json <-> .ci-package.json mirror check
+```
 
-This repo now runs the pre-commit framework (markdownlint-cli2, pre-commit-hooks, giticket, conventional-commit) **alongside** husky's eslint/prettier. Hard-won rules:
+`npm test` is (`package.json` and `.ci-package.json` carry the identical string):
 
-- **`.husky/pre-commit` must skip `pre-commit run` when `.pre-commit-config.yaml` is unstaged.** The release's `make run_precommit_hooks` invokes `.husky/pre-commit` **directly** (not via a git commit), and the codegen leaves the config unstaged → `pre-commit run` aborts with _"Your pre-commit configuration is unstaged"_ → the entire release fails. The guard (present in `.husky/pre-commit`): `if command -v pre-commit && git diff --quiet -- .pre-commit-config.yaml; then pre-commit run; fi` — still enforced on normal dev commits (config clean there).
-- **The release `git commit` uses `--no-verify`** so husky can't reformat the freshly-generated RELEASE.md / package.json mid-commit and break the release.
-- **markdownlint MD053 is disabled** in `.markdownlint-cli2.yaml`. Its auto-fix DELETES the `[comment]: <> (START/END OF GITHUB README)` reference-definition markers that the release Makefile slices the published README with (`perl … /START OF GITHUB README/../END OF GITHUB README/`). **Never re-enable MD053 here** — it silently breaks the README slice.
-- **RELEASE.md is the authoritative changelog and the release tag holds the complete history.** A markdownlint/`--all-files` pass (or a careless manual "dedup") can drop `## Release … X.Y.Z` headings; if that happens, restore `RELEASE.md` + `src/RELEASE.md` from the latest release tag.
+```text
+c8 --100 --per-file --all --include 'auth/**/*.js' --include 'examples/**/*.js' --exclude '**/*.spec.js'
+   --reporter text node --test auth/offlineTokenProvider.spec.js examples/client.spec.js
+```
+
+Each flag is load-bearing:
+
+- `--100` -- statements, branches, functions **and** lines all at 100.
+- `--per-file` -- a weak file cannot be averaged away by a strong one.
+- `--all` -- a **new hand-written file that no spec requires** is reported at 0% and fails the build.
+  Without it the gate is blind to exactly the file most likely to be untested. (Verified: dropping an
+  untested `examples/probe.js` makes `npm test` exit 1 with four `does not meet threshold` errors.)
+
+Both specs are hermetic: the Keycloak token endpoint is driven through the injectable `fetchImpl` option
+(or a stubbed `globalThis.fetch`), the gRPC-web client and message classes are fakes, and `node:test`
+`mock.timers` drives the refresh loop. **No network, no live server, no `api/` bundle is loaded.**
+
+The only coverage exclusion is a 6-line commented `/* c8 ignore next 6 */` over the
+`if (require.main === module)` CLI auto-run at the bottom of `examples/client.js` -- unreachable under
+`node --test`, where `require.main` is the spec file. Do not add broader ones; write a test instead.
+
+## CI: `.github/workflows/tests.yml` is the only workflow
+
+Runs on push to any branch and on every pull request. Five steps, in order:
+`actions/checkout@v5` -> `actions/setup-node@v5` (Node **20**) -> `npm install --no-audit --no-fund` ->
+`npm run test:drift` -> `npm test`. There is no deploy step and no publish step in CI; releasing is
+manual (`make ondewo_release`).
+
+What turns it red, in practice:
+
+- a spec failure, or **any** drop below 100% on `auth/` or `examples/` -- including a brand-new
+  hand-written file with no spec;
+- `package.json` and `.ci-package.json` disagreeing on a script / devDependency / dependency.
+
+Reproduce it locally by running those three `run:` blocks verbatim. `make eslint` and
+`make prettier` are **not** in CI -- they run in `.husky/pre-commit`.
+
+## Proto-compiler pin: gitlink + Makefile, never codegen
+
+Two things must agree, and nothing else changes:
+
+1. the `ondewo-proto-compiler` submodule gitlink -- currently
+   `b71f8ed4575ecc4ee8084389a075514acac61ff4` = tag **5.14.0**;
+2. `ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.14.0` in the `Makefile` (line 20), which
+   `make check_out_correct_submodule_versions` checks out before every build. **If the Makefile pin is
+   older than the gitlink, `make build` silently DOWNGRADES the submodule.**
+
+To bump:
+
+```shell
+git submodule update --init --recursive
+git -C ondewo-proto-compiler fetch --tags origin
+git -C ondewo-proto-compiler checkout <VERSION>
+git add ondewo-proto-compiler
+perl -i -pe 's|^ONDEWO_PROTO_COMPILER_GIT_BRANCH=.*|ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/<VERSION>|' Makefile
+git submodule status | grep proto-compiler    # must show the new tag
+```
+
+Verified no-ops for the 5.11.0 -> 5.14.0 bump, so they must NOT appear in the diff:
+
+- `Dockerfile.utils` already declares `ENV NODE_VERSION=24.14.0`, exactly what 5.14.0's Makefile wants.
+- The canonical `update_proto_compiler_dependency.sh` jq merge of
+  `ondewo-proto-compiler/js/image-data/default-lib-files/package.json` into `src/package.json` (the `js`
+  special case -- note `default-lib-files/`) produces a byte-identical file: between 5.11.0 and 5.14.0
+  only the image manifest's own `"version"` changed, and the merge never reads `.version`.
+
+**A pin bump ships NONE of the compiler's fixes.** `git diff --stat 5.11.0..5.14.0` in the compiler
+touches only `angular/`, `js/`, `nodejs/`, `typescript/`, `tests/` and root tooling -- they are entirely
+codegen changes. Moving the pin changes which image `make build` _would_ build; it does not rewrite one
+byte of the already-committed `api/` bundle. Never write a RELEASE.md line claiming "regenerated with
+proto-compiler X" for a pin-only bump.
+
+## Pre-commit: hook ORDER is the rule that bites
+
+`.pre-commit-config.yaml` declares two `commit-msg`-stage hooks, and pre-commit runs repos in
+**declaration order**:
+
+1. `compilerla/conventional-pre-commit` -- validates the subject;
+2. `milin/giticket` -- rewrites it to `[OND231-624] feat: ...` from the branch name.
+
+**Validate first, decorate second.** With giticket first, giticket's `[TICKET]` prefix was handed to
+conventional-pre-commit, which rejected it: every commit on a `feature/OND231-...` branch failed and
+could only be made with `--no-verify`. The bug is invisible on `master`, where the branch name matches no
+ticket and giticket adds nothing. Verified on a throwaway `feature/OND231-624-probe` branch: `chore: probe`
+passes both hooks and becomes `[OND231-624] chore: probe`.
+
+Never prepend the ticket id yourself -- giticket does it, and doing both yields
+`[OND231-624] [OND231-624] feat: ...`.
+
+Hook revs, all at the newest stable as of this writing: `markdownlint-cli2 v0.23.2`,
+`pre-commit-hooks v6.0.0`, `conventional-pre-commit v4.4.0`, `giticket '1.92'` (keep it **quoted** --
+unquoted `1.92` is a YAML float and the tag lookup then fails).
+
+## Prettier vs. pre-commit: the deadlock, and why `.prettierignore` is long
+
+`.husky/pre-commit` runs `make prettier PRETTIER_WRITE=-w` **before** `pre-commit run`. Any file prettier
+rewrites there is left unstaged; if that file is `.pre-commit-config.yaml`, `pre-commit run` aborts with
+_"Your pre-commit configuration is unstaged"_ and the commit (or the release) dies. So `.prettierignore`
+deliberately lists, each with the reason inline: `.pre-commit-config.yaml`, `.markdownlint-cli2.yaml`,
+`CLAUDE.md`, `README.md`, `RELEASE.md`, `.ci-package.json`, `package.json`, `coverage/`, `.nyc_output/`.
+`make prettier` must report _"All matched files use Prettier code style!"_ -- if it does not, fix the
+file or add it to `.prettierignore` with a reason; do not leave it warning.
+
+`README.md` is ignored for a second, harder reason: prettier rewrites
+`[comment]: <> (START OF GITHUB README)` into `[comment]: <> 'START OF GITHUB README'`, and `make build`
+slices the published README between exactly those markers.
+
+**markdownlint MD053 is disabled** in `.markdownlint-cli2.yaml` for the same markers -- its auto-fix
+DELETES them as "unused link reference definitions". Never re-enable it here.
+
+`RELEASE.md` / `src/RELEASE.md` survive markdownlint's auto-fix (verified): it only normalises trailing
+whitespace, blank lines and list indentation. The `## Release ONDEWO T2S Js Client <VERSION>` headings and
+the `*****************` separators -- both of which `CURRENT_RELEASE_NOTES` and `ondewo_release` grep for
+-- are untouched. Confirm with `make TEST`, which prints the slice for the current version.
+
+## Local-environment sharp edges
+
+- **`pre-commit` may not be on `PATH`.** `.husky/pre-commit` guards its call with `command -v pre-commit`
+  and silently skips it; `.husky/commit-msg` does **not** and will fail. Install it
+  (`make install_precommit_hooks`) or run the framework as `uvx pre-commit ...`.
+- **`uvx pre-commit run --hook-stage commit-msg ...` refuses to run while `.pre-commit-config.yaml` has
+  unstaged changes.** `git add .pre-commit-config.yaml` first.
+- **husky hooks only fire once `core.hooksPath` is set** (`npx husky install`, from
+  `make install_precommit_hooks`; husky 9 prints a DEPRECATED warning but still writes the config). On a
+  fresh clone `git commit` runs no hooks at all, so `npm test` / `make eslint` are on you.
+- **`auth/*.js` is in `eslint.config.mjs`'s `ignores`.** `make eslint` does not lint the auth provider or
+  its spec; only `examples/` and the config files are checked. `examples/client.js:59` has a standing
+  `no-ternary` **warning** (not an error) -- pre-existing, leave it.
+
+## Release: `make ondewo_release`
+
+`release` builds, checks the generated code, runs the husky hooks, commits, pushes, publishes to npm via
+the utils docker image, then creates the release branch, tag and GitHub release. Gotchas that are real
+here:
+
+- **The `git commit` in `release` is `-git commit --no-verify`.** The leading `-` makes make ignore the
+  non-zero exit git returns when the build produced nothing to stage -- without it an unchanged build
+  aborted the entire release. `--no-verify` stops husky reformatting the freshly generated
+  `RELEASE.md` / `package.json` mid-commit.
+- **`create_npm_package` strips test files.** `cp -R auth npm` used to ship
+  `auth/offlineTokenProvider.spec.js` inside the published tarball; the recipe now runs
+  `rm -f npm/auth/*.spec.* npm/auth/*.test.*` and writes an `npm/.npmignore`. The **root** `.npmignore` is
+  never consulted, because `npm_release` publishes `./npm`. Check with
+  `make create_npm_package && npm pack --dry-run ./npm | grep -c spec` (must print `0`).
+- **Token-bearing recipe lines are `@`-prefixed** (`docker run -e ...`, `echo $(TOKEN) | gh auth`,
+  `make release $(info)`) so make never echoes a secret. Do not regress that.
+- **Codegen must run TTY-free** -- `docker run` without `-it`, else the non-interactive release dies with
+  `cannot attach stdin to a TTY-enabled container because stdin is not a terminal`. Verified: `-it`
+  appears nowhere in the `Makefile`, `package.json` or `src/package.json` today. Keep it that way.
+- **npm package name is `@ondewo/ondewo-t2s-client-js`** (double `ondewo`). Check `src/package.json`'s
+  `name` before querying the registry.
+
+## The release regenerates root `package.json` -- CI scripts survive via `.ci-package.json`
+
+The codegen (`cd src && npm run build`, output-volume = the **repo root**) rewrites the ROOT
+`package.json` from the compiler's template, dropping the CI test scripts and test devDeps. The durable
+fix, present here:
+
+- **`.ci-package.json`** holds `test`, `test:drift`, and the test-only deps (`c8`, `dotenv`, `undici`);
+  it is immune to the codegen.
+- **`make restore_ci_test_setup`** runs inside `build` before `create_npm_package` and merges
+  `.ci-package.json` back into the regenerated root `package.json`. It is an **inline `node -e`** on
+  purpose -- a helper `.js` file gets linted by the release's eslint pass and fails the release.
+- **`npm run test:drift`** (also a CI step) fails the build when the two files disagree on any script,
+  devDependency or dependency `.ci-package.json` declares -- so a stale mirror is caught on the commit
+  that introduced it rather than after the next release.
+- **Runtime deps the shipped auth helper needs (`undici`) must be declared in `src/package.json`**, the
+  codegen's source of truth, or the published package loses them.
+- **`remove_npm_script`** strips the scripts block from the `npm/` _copy_ only, and is guarded against a
+  missing `npm/` dir and an empty scripts block.
