@@ -105,7 +105,16 @@ no Jenkinsfile.
 | `src/package.json`, `src/README.md`, `src/RELEASE.md` | humans | **yes** -- these are the codegen's sources |
 
 `make build` copies `src/{package.json,README.md,RELEASE.md}` over the ROOT copies, so **edit both** or the
-next release silently reverts the root file. They are byte-identical today.
+next release silently reverts the root file. `README.md` / `src/README.md` are byte-identical today, and so
+are `RELEASE.md` / `src/RELEASE.md`.
+
+`package.json` is the deliberate exception: `src/package.json` is the codegen's source of truth and carries
+no test setup, while the ROOT copy additionally holds the CI `test` / `test:drift` scripts and the
+`c8` / `dotenv` devDeps that `make restore_ci_test_setup` merges back in from `.ci-package.json` right after
+the codegen overwrites it (see the last section). The two files are therefore **divergent by design** --
+`diff src/package.json package.json` is expected to be non-empty; never "fix" it by copying one over the
+other. What must be mirrored into `src/package.json` is only what the _published_ package needs at runtime
+(e.g. `undici`).
 
 `auth/` and `examples/` are the entire hand-written surface; the coverage gate is scoped to exactly those
 two directories.
@@ -137,9 +146,16 @@ Both specs are hermetic: the Keycloak token endpoint is driven through the injec
 (or a stubbed `globalThis.fetch`), the gRPC-web client and message classes are fakes, and `node:test`
 `mock.timers` drives the refresh loop. **No network, no live server, no `api/` bundle is loaded.**
 
-The only coverage exclusion is a 6-line commented `/* c8 ignore next 6 */` over the
-`if (require.main === module)` CLI auto-run at the bottom of `examples/client.js` -- unreachable under
-`node --test`, where `require.main` is the spec file. Do not add broader ones; write a test instead.
+There are exactly **two** coverage exclusions in the hand-written surface, each a single site carrying its
+reason in the comment. `grep -rn 'c8 ignore' auth/ examples/` must keep returning these two and nothing else:
+
+- `examples/client.js` -- `/* c8 ignore next 6 */` over the `if (require.main === module)` CLI auto-run at
+  the bottom of the file: unreachable under `node --test`, where `require.main` is the spec file.
+- `auth/offlineTokenProvider.js` -- `// c8 ignore next` over the `typeof this.timer.unref === 'function'`
+  guard in the refresh-timer scheduler: Node's real `setTimeout` always returns a `Timeout` exposing
+  `unref()`, so the false branch only guards exotic non-Node shims.
+
+Do not add broader ones -- no file-level or blanket pragmas; write a test instead.
 
 ## CI: `.github/workflows/tests.yml` is the only workflow
 
@@ -163,9 +179,10 @@ Two things must agree, and nothing else changes:
 
 1. the `ondewo-proto-compiler` submodule gitlink -- currently
    `b71f8ed4575ecc4ee8084389a075514acac61ff4` = tag **5.14.0**;
-2. `ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.14.0` in the `Makefile` (line 20), which
+2. `ONDEWO_PROTO_COMPILER_GIT_BRANCH=tags/5.14.0` in the `Makefile`, which
    `make check_out_correct_submodule_versions` checks out before every build. **If the Makefile pin is
-   older than the gitlink, `make build` silently DOWNGRADES the submodule.**
+   older than the gitlink, `make build` silently DOWNGRADES the submodule** -- that is exactly how the
+   6.6.1 release regressed the gitlink from 5.13.0 back to 5.11.0.
 
 To bump:
 
