@@ -102,6 +102,15 @@ function buildTokenEndpoint(keycloakUrl, realm) {
 }
 
 /**
+ * The undici `Agent` options that switch TLS certificate verification OFF for the token request. Exported
+ * so the security-relevant `rejectUnauthorized: false` literal is pinned by a test rather than living as a
+ * bare literal that could be flipped without any test noticing.
+ *
+ * @type {{ connect: { rejectUnauthorized: boolean } }}
+ */
+const INSECURE_AGENT_OPTIONS = { connect: { rejectUnauthorized: false } };
+
+/**
  * Lazily-created, cached undici `Agent` that skips TLS certificate verification. Built only when the
  * insecure code path is first taken (`keycloakVerifySsl === false`), so `undici` is never required in the
  * common secure path.
@@ -123,7 +132,7 @@ function getInsecureDispatcher() {
 	if (insecureDispatcher === null) {
 		// eslint-disable-next-line global-require
 		const { Agent } = require('undici');
-		insecureDispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+		insecureDispatcher = new Agent(INSECURE_AGENT_OPTIONS);
 	}
 	return insecureDispatcher;
 }
@@ -288,7 +297,8 @@ class OfflineTokenProvider {
 	 * @returns {Promise<void>}
 	 *     Resolves once the access/refresh tokens are stored and the first refresh is scheduled.
 	 * @throws {TokenError}
-	 *     When the token endpoint fails or the response carries no offline `refresh_token`.
+	 *     When the token endpoint fails, or when the response carries no usable `refresh_token` -- absent,
+	 *     not a string, or empty.
 	 */
 	async bootstrap(username, password) {
 		const tokenResponse = await postTokenRequest(
@@ -304,7 +314,13 @@ class OfflineTokenProvider {
 			this.verifySsl
 		);
 		this.accessToken = tokenResponse.access_token;
-		this.refreshToken = typeof tokenResponse.refresh_token === 'string' ? tokenResponse.refresh_token : null;
+		// An empty string is rejected exactly like a missing token, mirroring the rotation guard in
+		// refresh(): a blank offline token would otherwise bootstrap a provider whose every renewal POSTs
+		// `refresh_token=` and fails, turning a clear login error into a silent expiry ~5 minutes later.
+		this.refreshToken =
+			typeof tokenResponse.refresh_token === 'string' && tokenResponse.refresh_token.length > 0
+				? tokenResponse.refresh_token
+				: null;
 		if (this.refreshToken === null) {
 			throw new TokenError(
 				'Keycloak token response did not contain a refresh_token; the SDK client must have ' +
@@ -482,4 +498,4 @@ async function login(options) {
 	return provider;
 }
 
-module.exports = { TokenError, OfflineTokenProvider, login };
+module.exports = { TokenError, OfflineTokenProvider, login, INSECURE_AGENT_OPTIONS };

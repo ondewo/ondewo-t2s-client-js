@@ -24,7 +24,7 @@ const assert = require('node:assert/strict');
 
 const { Agent } = require('undici');
 
-const { login, OfflineTokenProvider, TokenError } = require('./offlineTokenProvider');
+const { login, OfflineTokenProvider, TokenError, INSECURE_AGENT_OPTIONS } = require('./offlineTokenProvider');
 
 /**
  * The shared, valid base options for the public SDK client, spread into each test's `login()` call and
@@ -274,6 +274,21 @@ runTestCase('login rejects a non-2xx token response with TokenError', async () =
 
 runTestCase('login rejects when the token response carries no refresh_token (missing offline_access)', async () => {
 	const stub = makeFetchStub([{ body: { access_token: 'access-1', expires_in: 300 } }]);
+	await assert.rejects(() => login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl }), TokenError);
+});
+
+runTestCase('login rejects a token response whose refresh_token is an empty string', async () => {
+	// Present but blank is as unusable as absent: it must fail loudly at login rather than bootstrap a
+	// provider whose first background refresh POSTs an empty refresh_token and silently lapses.
+	const stub = makeFetchStub([{ body: { access_token: 'access-1', refresh_token: '', expires_in: 300 } }]);
+	await assert.rejects(
+		() => login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl }),
+		(error) => error instanceof TokenError && /did not contain a refresh_token/.test(error.message)
+	);
+});
+
+runTestCase('login rejects a token response whose refresh_token is not a string', async () => {
+	const stub = makeFetchStub([{ body: { access_token: 'access-1', refresh_token: 12345, expires_in: 300 } }]);
 	await assert.rejects(() => login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl }), TokenError);
 });
 
@@ -598,6 +613,10 @@ runTestCase('keycloakVerifySsl=false attaches an insecure undici dispatcher to t
 	const provider = await login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl, keycloakVerifySsl: false });
 	assert.notEqual(stub.calls[0].init.dispatcher, undefined);
 	assert.ok(stub.calls[0].init.dispatcher instanceof Agent);
+	// Pin the security-relevant literal itself: an Agent built with `rejectUnauthorized: true` would
+	// silently disable the whole opt-out (self-signed Envoy logins would start failing the handshake)
+	// while still satisfying the `instanceof Agent` assertion above.
+	assert.deepEqual(INSECURE_AGENT_OPTIONS, { connect: { rejectUnauthorized: false } });
 	provider.stop();
 });
 
