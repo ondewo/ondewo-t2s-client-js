@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Local equivalent of the CI gate: run every test case and enforce the 100% coverage
+# threshold on the hand-written sources before anything leaves this machine.
+#
+# This lives on pre-push and deliberately NOT in .husky/pre-commit:
+# `make run_precommit_hooks` executes .husky/pre-commit DIRECTLY and `make release` calls it,
+# so `npm test` in pre-commit would run the coverage gate inside the automated release -
+# right after the codegen has rewritten api/ and package.json.
+set -e
+npm test
