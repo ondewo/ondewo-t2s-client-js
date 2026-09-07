@@ -13,7 +13,6 @@ exclude: '(^|/)(node_modules|lib|dist|build|coverage|\.venv)/|(_pb\.(js|d\.ts)$|
 fail_fast: false
 
 repos:
-
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.23.2
     hooks:
@@ -23,8 +22,8 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-added-large-files
-        args: [ maxkb=1024 ]
-      - id: check-json          # validate (does NOT reformat) json/package.json
+        args: [maxkb=1024]
+      - id: check-json # validate (does NOT reformat) json/package.json
       - id: check-yaml
       - id: check-xml
       - id: check-merge-conflict
@@ -34,22 +33,24 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
 
-  # ORDER MATTERS: both of the hooks below run at the commit-msg stage, and
-  # pre-commit runs them in the order the repos are declared here.
-  # giticket rewrites the subject to "[OND231-624] feat: …", which is no
-  # longer valid Conventional Commits — so it MUST come after the validation.
-  # With giticket first, every commit on a ticket branch failed the
-  # Conventional Commit hook and could only be made with --no-verify.
+  # conventional-pre-commit MUST stay declared BEFORE giticket. Both run at the commit-msg
+  # stage and pre-commit runs them in declaration order. giticket rewrites the subject to
+  # "[OND221-2830] feat: …", which is no longer valid Conventional Commits, so with giticket
+  # first EVERY commit on a ticket branch fails this hook and can only land with --no-verify.
+  # Validate first, decorate second.
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.4.0
     hooks:
       - id: conventional-pre-commit
-        stages: [ commit-msg ]
+        stages: [commit-msg]
 
   - repo: https://github.com/milin/giticket
     rev: '1.92'
     hooks:
       - id: giticket
-        args: [ '--regex=(?:(?:feature|bugfix|support|hotfix)/)?(OND[0-9]{3}-[0-9]{1,5})[_-][\w-]+',
-                '--format=[{ticket}] {commit_msg}',
-                '--mode=regex_match' ]
+        args:
+          [
+            '--regex=(?:(?:feature|bugfix|support|hotfix)/)?(OND[0-9]{3}-[0-9]{1,5})[_-][\w-]+',
+            '--format=[{ticket}] {commit_msg}',
+            '--mode=regex_match'
+          ]
