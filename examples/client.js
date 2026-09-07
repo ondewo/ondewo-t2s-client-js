@@ -253,7 +253,9 @@ async function main() {
 module.exports = { buildSynthesizeRequest, bearerMetadata, synthesizeText, buildEndpoint, requireEnv, main };
 
 // Reference entrypoint: run `node examples/client.js` against a live T2S deployment configured via
-// `examples/environment.env`. Not reached by the unit tests (which import the helpers above).
+// `examples/environment.env`. Not reached by the unit tests, which `require` this module -- so
+// `require.main` there is the spec file, never this file.
+/* c8 ignore next 6 -- CLI-only auto-run: unreachable under `node --test`, where require.main is the spec */
 if (require.main === module) {
 	main().catch((error) => {
 		console.error('FAILED: T2S synthesize example errored:', error);
