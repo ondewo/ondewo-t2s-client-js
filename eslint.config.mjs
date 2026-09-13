@@ -111,5 +111,24 @@ export default [
 				}
 			]
 		}
+	},
+	{
+		// tests/ holds hand-written CommonJS run on Node (`node --test`), not browser code. The
+		// `**/*.js` block above declares browser globals and `sourceType: 'module'`, which makes
+		// every `require` and `__dirname` in a spec a no-undef error.
+		files: ['tests/**/*.js'],
+		languageOptions: {
+			globals: {
+				require: 'readonly',
+				__dirname: 'readonly',
+				module: 'writable',
+				exports: 'writable',
+				process: 'readonly',
+				console: 'readonly',
+				globalThis: 'readonly'
+			},
+			ecmaVersion: 2022,
+			sourceType: 'commonjs'
+		}
 	}
 ];

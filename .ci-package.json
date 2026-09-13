@@ -1,8 +1,9 @@
 {
   "description": "ONDEWO Text to Speech (T2S) Client library for Js",
   "scripts": {
-    "test": "c8 --100 --per-file --all --include 'auth/**/*.js' --include 'examples/**/*.js' --exclude '**/*.spec.js' --reporter text node --test auth/offlineTokenProvider.spec.js examples/client.spec.js",
-    "test:drift": "node -e \"const p=require('./package.json'),c=require('./.ci-package.json'),d=[];for(const s of ['scripts','devDependencies','dependencies'])for(const k of Object.keys(c[s]||{}))if((p[s]||{})[k]!==c[s][k])d.push(s+'.'+k+' -> package.json: '+JSON.stringify((p[s]||{})[k])+' | .ci-package.json: '+JSON.stringify(c[s][k]));if(d.length){console.error('DRIFT: package.json and .ci-package.json disagree on '+d.length+' key(s):');for(const m of d)console.error('  '+m);process.exit(1)}console.log('OK: package.json matches .ci-package.json on every script and dependency it declares')\""
+    "test": "c8 --100 --per-file --all --include 'auth/**/*.js' --include 'examples/**/*.js' --exclude '**/*.spec.js' --reporter text node --test auth/offlineTokenProvider.spec.js examples/client.spec.js && npm run test:protos",
+    "test:drift": "node -e \"const p=require('./package.json'),c=require('./.ci-package.json'),d=[];for(const s of ['scripts','devDependencies','dependencies'])for(const k of Object.keys(c[s]||{}))if((p[s]||{})[k]!==c[s][k])d.push(s+'.'+k+' -> package.json: '+JSON.stringify((p[s]||{})[k])+' | .ci-package.json: '+JSON.stringify(c[s][k]));if(d.length){console.error('DRIFT: package.json and .ci-package.json disagree on '+d.length+' key(s):');for(const m of d)console.error('  '+m);process.exit(1)}console.log('OK: package.json matches .ci-package.json on every script and dependency it declares')\"",
+    "test:protos": "node --test tests/bundleStringRoundTrip.spec.js"
   },
   "devDependencies": {
     "c8": "^11.0.0",

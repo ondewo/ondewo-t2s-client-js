@@ -104,6 +104,9 @@ release: ## Create Github and NPM Release
 # It is top-level, so `git add src` does NOT cover it: leaving it out publishes a change to the
 # registry while the git tag of that same version does not contain it.
 	git add auth
+# tests/, .ci-package.json and the eslint config are NOT packaged, but leaving them out means a
+# regression test written alongside a fix never reaches the repository and CI never runs it.
+	git add tests .ci-package.json eslint.config.mjs
 # README.md is a BUILD OUTPUT: `make build` runs `cp src/README.md .`, so anything written only
 # in the root copy is destroyed on the next build. src/README.md is the source of truth (covered
 # by `git add src`); this stages the generated copy so the tracked file cannot drift from it.
