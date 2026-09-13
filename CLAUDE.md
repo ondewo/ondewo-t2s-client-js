@@ -481,3 +481,37 @@ number over it; wait and re-check.
 ```bash
 npm view <pkg> version ; git tag --list <version> ; gh release view <version> --json body --jq '.body|length'
 ```
+
+### The published artefact can be broken while every source-level check is green
+
+The generated protobuf code and the `google-protobuf` RUNTIME are two separate things, and nothing
+in a normal test run compares them. The proto compiler began emitting
+`reader.readStringRequireUtf8()`; that method does not exist in `google-protobuf` 3.21.4, and the
+manifests pinned `3.21.4` / `^3.21.4` — ranges that can never reach the 4.x line where it was added.
+A package built from those two **cannot decode a single string field**, and it shipped that way:
+nlu-client-js and -typescript 7.1.0-7.1.2, csi-client-js 5.5.0-5.5.3 and -typescript 5.5.0-5.5.2,
+vtsi-client-js and -typescript 8.7.0.
+
+Every source-level signal was green the whole time — the `.proto` files, the generated code, the auth
+suite, the 100% coverage gate. Two properties are what made it invisible:
+
+- **A `-js` bundle EMBEDS its runtime.** `api/ondewo_*_api.js` is self-contained, so the defect is
+  frozen into the artefact at build time and a consumer's own `google-protobuf` cannot repair it.
+- **The committed artefact lags the compiler.** A repository whose bundle predates the compiler change
+  looks fine and is still armed: the defect appears at the NEXT release and not before. That is
+  exactly what a plain `make build` demonstrated here — 106 new `readStringRequireUtf8` call sites
+  against a runtime with none.
+
+**The guard is `tests/bundleStringRoundTrip.spec.js` (or `.spec.ts`): it loads the SHIPPED ARTEFACT
+and decodes a string with multi-byte characters.** Only a test at that level can see this. It is
+verified falsifiable — against the old pin it reports 0 passed, 2 failed with that exact `TypeError`.
+
+```bash
+node --test tests/bundleStringRoundTrip.spec.js     # must pass before any release
+grep -m1 google-protobuf src/package.json           # must be on the 4.x line
+```
+
+**Two general rules fall out of it.** When a package ships a BUILT artefact, test the artefact and not
+only its sources — a green suite over inputs says nothing about the output. And when a generator and a
+runtime are pinned separately, a generator upgrade is a runtime decision: check the pair, because
+neither side reports the mismatch.
