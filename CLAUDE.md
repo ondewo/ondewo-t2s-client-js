@@ -307,3 +307,109 @@ fix, present here:
   codegen's source of truth, or the published package loses them.
 - **`remove_npm_script`** strips the scripts block from the `npm/` _copy_ only, and is guarded against a
   missing `npm/` dir and an empty scripts block.
+
+## Releasing: preflight and the traps that have actually bitten
+
+Written after a release program across every ONDEWO client in one session. Each item below
+cost real time or a broken artefact; every statement is derived from THIS repo's Makefile.
+
+### Before you touch the version, check the released tag is in `master`
+
+Releases here are cut from a `release/<version>` branch and are **not always merged back**, so
+`master` can be missing work that is already published — and because a later version number
+sorts above the unmerged one, a consumer upgrading silently loses it. The ondewo-nlu-client-python
+7.1.0 release was exactly this: it shipped from a `master` that had never seen 7.0.5's
+offline-token hand-off, so PyPI's newest release was a regression against its predecessor.
+
+```bash
+latest=$(git tag --sort=-v:refname | head -1)
+git merge-base --is-ancestor "$latest" master && echo "in master" || echo "NOT in master -- merge first"
+```
+
+A fast-forward (`git merge --ff-only <tag>`) is the common case. A true merge needs care: resolve
+metadata toward `master` and keep BOTH release-note sections, newest first — a reader upgrading
+from the older line still needs the older entry.
+
+### `git add` on a dirty submodule stages the WRONG commit
+
+This repo has submodules (`ondewo-proto-compiler`, `src/ondewo-t2s-api`). If a submodule's working
+tree is dirty, `git add <submodule>` stages **its current HEAD**, not the pointer you resolved
+during a merge — silently regressing it to an older commit. `git checkout master -- <submodule>`
+fixes the index but the next `git add` re-breaks it. Move the working tree instead:
+
+```bash
+want=$(git ls-tree master <submodule> | awk '{print $3}')
+git -C <submodule> checkout -q "$want" && git add <submodule>
+```
+
+### The release notes are sliced by an EXACTLY-CASED heading
+
+`CURRENT_RELEASE_NOTES` slices `RELEASE.md` with a perl range. In THIS repo the opening
+pattern is, verbatim:
+
+```text
+Release ONDEWO T2S Js Client ${ONDEWO_T2S_VERSION}
+```
+
+So the heading of a new entry must read exactly `## Release ONDEWO T2S Js Client <version>`. **This wording is
+not consistent across the ONDEWO repos** — some say `... <Name> Client`, some `... Client
+<Name>` with the words reversed, the API repos say `... API` with no `Client` at all, and the
+casing varies (`Js`, `Nodejs`, `Typescript`, `Survey`). Do not carry a heading over from a
+sibling repo. Copy the PREVIOUS entry in this file and change only the version, or read the
+pattern above out of the Makefile.
+
+A heading that does not match yields an **empty slice**, and the GitHub release is then
+created with empty notes or fails outright. Verify before releasing:
+
+```bash
+grep -c '^## Release ONDEWO T2S Js Client ' RELEASE.md     # must be >= 1 for your new version
+```
+
+### `src/RELEASE.md` is the source of truth; the root file is GENERATED
+
+The build runs `cp src/RELEASE.md .`, so an edit to the root `RELEASE.md` is **discarded by
+the next build**. Write the entry in `src/RELEASE.md` (and copy it to the root if you want to
+read it before building). This is silent: the release completes and the notes are simply gone.
+
+### Publish order decides how a partial failure is recovered
+
+`make release` in this repo runs:
+
+1. `publish_npm_via_docker`
+2. `create_release_branch`
+3. `create_release_tag`
+4. `release_to_github_via_docker_image`
+
+The **npm publish happens FIRST**. So a failure in a later step (tag, GitHub release)
+leaves the package already published. Do **not** re-run `make ondewo_release` to recover: the
+`spc` guard refuses when the branch or tag already exists, and re-publishing the same version
+is rejected by the registry. Re-run only the step that failed, passing the credential it needs.
+
+### Verify against the registry, with the REAL package name
+
+This package publishes as **`@ondewo/ondewo-t2s-client-js`**, which is not always the repository name — the JS client
+publishes as `@ondewo/ondewo-nlu-client-js` (doubled `ondewo`), so a lookup by repo name returns
+a 404 that reads like a failed release. Check the name in the manifest first, then:
+
+```bash
+npm view @ondewo/ondewo-t2s-client-js versions --json
+```
+
+**An npm publish can be STAGED but not yet served.** Immediately after a publish the registry may
+answer 404 for the new version while refusing a re-publish with
+`409 Cannot publish over previously staged version`. That is not a failure and the version is
+not burned — wait and re-check before bumping to a new number.
+
+### The release prints credentials — read the log BEFORE you scrub it
+
+`make ondewo_release` clones `ondewo-devops-accounts` and passes the registry and GitHub tokens on
+the make command line, so they are echoed into the console and into any transcript capturing it.
+This is a known and accepted property of the shared release path: do **not** re-plumb the recipe.
+Redirect the run to a file, read it through a filter, and shred the file afterwards — and read it
+**before** shredding, or a genuine failure is lost with the secrets:
+
+```bash
+umask 077; make ondewo_release > /tmp/rel.log 2>&1; echo "RC=$?"
+grep -avE 'TOKEN|PASSWORD|USERNAME|_authToken' /tmp/rel.log | tail -20   # read FIRST
+shred -u /tmp/rel.log; rm -rf ondewo-devops-accounts                     # then scrub
+```
