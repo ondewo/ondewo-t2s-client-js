@@ -100,6 +100,14 @@ release: ## Create Github and NPM Release
 	git add api
 	git add Makefile
 	git add src
+# auth/ is the hand-written Keycloak provider and its spec (and for nodejs its build output).
+# It is top-level, so `git add src` does NOT cover it: leaving it out publishes a change to the
+# registry while the git tag of that same version does not contain it.
+	git add auth
+# README.md is a BUILD OUTPUT: `make build` runs `cp src/README.md .`, so anything written only
+# in the root copy is destroyed on the next build. src/README.md is the source of truth (covered
+# by `git add src`); this stages the generated copy so the tracked file cannot drift from it.
+	git add README.md
 	git add RELEASE.md
 	git add package.json
 	git add package-lock.json

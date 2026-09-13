@@ -413,3 +413,71 @@ umask 077; make ondewo_release > /tmp/rel.log 2>&1; echo "RC=$?"
 grep -avE 'TOKEN|PASSWORD|USERNAME|_authToken' /tmp/rel.log | tail -20   # read FIRST
 shred -u /tmp/rel.log; rm -rf ondewo-devops-accounts                     # then scrub
 ```
+
+### Run the release from `master`, and check with `git branch --show-current`
+
+A release ends by checking out `release/<version>`, and **nothing checks you out back**. Start the
+next release from that leftover checkout and `git commit` + `git push` land on the OLD release
+branch: the new `release/<version>` is cut from it, the tag points into it, and `master` never sees
+the release at all. Measured on ondewo-csi-client-typescript 5.5.1 -- npm had it, the tag had it,
+and `origin/master` was still at 5.5.0. Recovery was a fast-forward (`git merge --ff-only
+release/5.5.1`), which worked only because nothing else had moved; a diverged `master` needs a real
+merge.
+
+```bash
+git branch --show-current            # must print master BEFORE `make ondewo_release`
+```
+
+### The release `git add` list is an ALLOW-LIST, so anything outside it ships but is never committed
+
+`make build` writes files the release target then stages from a fixed list of paths. Anything the
+build touches that is not on that list reaches the registry and is **absent from the tag of that
+same version** -- two different things under one name, with nothing anywhere reporting it.
+
+- **`auth/`** -- the hand-written Keycloak provider and its spec. It is top-level, so `git add src`
+  does not cover it. csi-client-js and csi-client-typescript 5.5.1 went to npm carrying the refresh
+  fix and tagged a commit without it; 5.5.2 exists only to make the two agree.
+
+- **`README.md`**, which is a BUILD OUTPUT -- `make build` runs `cp src/README.md .`. Anything
+  written only in the root copy is destroyed by the next build. The typescript NLU client's
+  "Authentication" section lived in git history and nowhere else for exactly that reason; it belongs
+  in `src/README.md`, which is the source of truth.
+
+The general check costs nothing:
+
+```bash
+git status --porcelain    # MUST be empty after a release; anything left is published-but-uncommitted
+```
+
+### `git commit` exits 1 on a clean tree and takes the whole target down with it
+
+If the release content was already committed by hand, `git commit` finds nothing to commit, returns
+1, and make abandons the target -- **before** the publish, the branch, the tag and the GitHub
+release -- while printing only `nothing to commit, working tree clean`. Read as a build failure it
+sends you hunting a compile error that is not there. The line is prefixed with `-` so the step is
+advisory; `spc` still refuses an existing branch or tag, so the guard cannot mask a double release.
+
+### Write the RELEASE.md section BEFORE releasing, or the release body is silently empty
+
+`CURRENT_RELEASE_NOTES` slices RELEASE.md between the heading naming this exact version and the next
+`*****` separator. No heading means an EMPTY slice, `gh release create -n ""` succeeds, and you get a
+release with no notes and no error anywhere. ondewo-nlu-client-js and -typescript 7.1.1 shipped that
+way and had to be repaired after the fact.
+
+```bash
+cat RELEASE.md | perl -ne 'print if /<the exact heading> <version>/../^\*{5}/' | wc -l   # must be > 0
+```
+
+### Verify the three artefacts separately -- they fail independently
+
+GitHub's release API returned 500 twice in one session, leaving the registry and the tag correct and
+**no release object at all** (nlu-client-js and -angular 7.1.1); `gh release create` after the fact
+repairs it without touching the artefact.
+And npm answering `409 Cannot publish over previously staged
+version` is NOT a failure -- the publish SUCCEEDED and the registry has not served it yet, so a 404
+from `npm view` in the same minute is the same fact from the other side. Do not burn a version
+number over it; wait and re-check.
+
+```bash
+npm view <pkg> version ; git tag --list <version> ; gh release view <version> --json body --jq '.body|length'
+```
