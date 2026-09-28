@@ -29,7 +29,7 @@
     "directory": "https://github.com/ondewo/ondewo-t2s-client-js.git"
   },
   "dependencies": {
-    "google-protobuf": "^3.21.4",
+    "google-protobuf": "^4.0.2",
     "grpc-web": "^1.5.0",
     "webpack": "^5.99.9",
     "terser-webpack-plugin": "^5.3.14",
