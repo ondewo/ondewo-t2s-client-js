@@ -657,3 +657,41 @@ runTestCase('keycloakVerifySsl=false still logs in through an injected fetchImpl
 	assert.equal(provider.getAccessToken(), 'access-1');
 	provider.stop();
 });
+
+runTestCase('logging the provider never prints a token: toJSON and util.inspect redact both', async () => {
+	const { inspect } = require('node:util');
+	const stub = makeFetchStub([
+		{ body: { access_token: 'secret-access-token', refresh_token: 'secret-offline-token', expires_in: 300 } }
+	]);
+	const provider = await login({ ...BASE_OPTIONS, fetchImpl: stub.fetchImpl });
+	try {
+		for (const rendered of [JSON.stringify(provider), inspect(provider), inspect({ nested: provider })]) {
+			assert.ok(!rendered.includes('secret-access-token'), rendered);
+			assert.ok(!rendered.includes('secret-offline-token'), rendered);
+			assert.ok(!rendered.includes('super-secret'), rendered);
+			assert.ok(rendered.includes('***REDACTED***'), rendered);
+			assert.ok(rendered.includes(EXPECTED_TOKEN_ENDPOINT), rendered);
+		}
+		assert.deepEqual(JSON.parse(JSON.stringify(provider)), {
+			tokenEndpoint: EXPECTED_TOKEN_ENDPOINT,
+			clientId: BASE_OPTIONS.clientId,
+			accessToken: '***REDACTED***',
+			refreshToken: '***REDACTED***',
+			stopped: false
+		});
+		// The tokens themselves are untouched: only the logging view is redacted.
+		assert.equal(provider.getAuthorizationHeader(), 'Bearer secret-access-token');
+	} finally {
+		provider.stop();
+	}
+});
+
+runTestCase('an absent or empty token renders as is, not as ***REDACTED***', () => {
+	const provider = new OfflineTokenProvider({ ...BASE_OPTIONS });
+	assert.equal(provider.toJSON().accessToken, null);
+	assert.equal(provider.toJSON().refreshToken, null);
+	provider.accessToken = '';
+	provider.refreshToken = '';
+	assert.equal(provider.toJSON().accessToken, '');
+	assert.equal(provider.toJSON().refreshToken, '');
+});
