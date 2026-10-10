@@ -1,6 +1,6 @@
 {
   "name": "@ondewo/ondewo-t2s-client-js",
-  "version": "6.6.1",
+  "version": "6.6.2",
   "description": "ONDEWO Text to Speech (T2S) Client library for Js",
   "author": "ONDEWO GmbH <office@ondewo.com>",
   "homepage": "https://ondewo.com",
@@ -15,7 +15,6 @@
   ],
   "scripts": {
     "test": "c8 --100 --per-file --all --include 'auth/**/*.js' --include 'examples/**/*.js' --exclude '**/*.spec.js' --reporter text node --test auth/offlineTokenProvider.spec.js auth/grpcWebEndpoint.spec.js examples/client.spec.js && npm run test:protos && npm run test:release-notes",
-    "test:drift": "node -e \"const p=require('./package.json'),c=require('./.ci-package.json'),d=[];for(const s of ['scripts','devDependencies','dependencies'])for(const k of Object.keys(c[s]||{}))if((p[s]||{})[k]!==c[s][k])d.push(s+'.'+k+' -> package.json: '+JSON.stringify((p[s]||{})[k])+' | .ci-package.json: '+JSON.stringify(c[s][k]));if(d.length){console.error('DRIFT: package.json and .ci-package.json disagree on '+d.length+' key(s):');for(const m of d)console.error('  '+m);process.exit(1)}console.log('OK: package.json matches .ci-package.json on every script and dependency it declares')\"",
     "initialize": "git submodule update --init --recursive --remote",
     "build": "docker run -v ${PWD}:/input-volume -v ${PWD}/../api:/output-volume ondewo-js-proto-compiler ondewo-t2s-api ondewo-t2s-api ondewo",
     "debug": "docker run --entrypoint /bin/bash -v ${PWD}/src:/input-volume -v ${PWD}/src/..:/output-volume $npm_package_config_compiler",
@@ -24,6 +23,7 @@
     "start-example": "sudo cp lib/t2s.js example/lib/t2s.js && http-server example",
     "example-link-lib": "sudo ln -s lib/t2s.js example/lib/t2s.js",
     "build-sample": "docker run -v ${PWD}/src:/input-volume -v ${PWD}/src/../api:/output-volume $npm_package_config_compiler t2s ondewo-t2s-api ondewo-t2s-api ondewo",
+    "test:drift": "node -e \"const p=require('./package.json'),c=require('./.ci-package.json'),d=[];for(const s of ['scripts','devDependencies','dependencies'])for(const k of Object.keys(c[s]||{}))if((p[s]||{})[k]!==c[s][k])d.push(s+'.'+k+' -> package.json: '+JSON.stringify((p[s]||{})[k])+' | .ci-package.json: '+JSON.stringify(c[s][k]));if(d.length){console.error('DRIFT: package.json and .ci-package.json disagree on '+d.length+' key(s):');for(const m of d)console.error('  '+m);process.exit(1)}console.log('OK: package.json matches .ci-package.json on every script and dependency it declares')\"",
     "test:protos": "node --test tests/bundleStringRoundTrip.spec.js",
     "test:release-notes": "node --test tests/releaseNotes.spec.js"
   },
@@ -32,7 +32,7 @@
     "directory": "https://github.com/ondewo/ondewo-t2s-client-js.git"
   },
   "dependencies": {
-    "google-protobuf": "^3.21.4",
+    "google-protobuf": "^4.0.2",
     "grpc-web": "^1.5.0",
     "terser-webpack-plugin": "^5.3.14",
     "undici": "^6.27.0",
@@ -41,14 +41,14 @@
     "webpack-merge": "^6.0.1"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.6",
+    "@eslint/eslintrc": "^3.3.7",
     "@eslint/js": "^9.39.5",
-    "@typescript-eslint/eslint-plugin": "^8.67.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.1",
     "c8": "^11.0.0",
     "dotenv": "^16.4.5",
     "eslint": "^9.39.5",
     "global": "^4.4.0",
     "husky": "^9.1.7",
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.9"
   }
 }

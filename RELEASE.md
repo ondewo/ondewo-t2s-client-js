@@ -4,12 +4,46 @@
 
 ## Release ONDEWO T2S Js Client 6.6.2
 
+### Improvements
+
+* [[OND211-2443]](https://ondewo.atlassian.net/browse/OND211-2443) TLS: new `auth/grpcWebEndpoint.js`
+  (`buildGrpcWebEndpoint`) builds the gRPC-web endpoint URL for the generated clients per the ONDEWO TLS contract:
+  `https://` by default, plaintext `http://` only with `useSecureChannel: false`, which logs a `console.warn` naming
+  `host:port`. A bare IPv6 host is bracketed (`::1` becomes `https://[::1]:8443`), a `[...]` host is kept as given, and
+  a host carrying a scheme, a path or a port, a port outside 1..65535 or a non-boolean `useSecureChannel` is refused.
+* [[OND211-2443]](https://ondewo.atlassian.net/browse/OND211-2443) `grpcCert`, `grpcClientCert` and `grpcClientKey`
+  are refused with an error naming the option, never its value: a browser verifies the server against its own trust
+  store and presents a client certificate only from its own certificate store, and a private key must never be shipped
+  to a browser. Mutual TLS from a browser works with a client certificate installed in the browser / OS certificate
+  store, or with the gRPC-web proxy (Envoy) terminating TLS and using mutual TLS upstream.
+* [[OND211-2443]](https://ondewo.atlassian.net/browse/OND211-2443) `OfflineTokenProvider` gains `toJSON()` and a Node
+  `util.inspect` hook that render the access and refresh tokens as `***REDACTED***` (a token not yet set stays `null`),
+  so `JSON.stringify`, `console.log` and `util.inspect` of a provider never print a token.
+* [[OND211-2443]](https://ondewo.atlassian.net/browse/OND211-2443) README: new section "TLS, mutual TLS and
+  certificates" (modes, the Envoy mutual-TLS setup, why gRPC-web has no keepalive / backoff channel options, and the
+  Node.js SDK for mutual TLS from code with PEM files).
+
 ### Bug Fixes
 
 * Auth: `login()` now rejects a Keycloak token response whose `refresh_token` is present but empty, instead of arming a refresh loop that can never succeed. The insecure-TLS escape hatch is pinned to a single frozen `rejectUnauthorized: false` agent option set.
 * Release: the published npm tarball no longer ships `auth/*.spec.js`. `create_npm_package` strips test files from the `npm/` copy and writes an `npm/.npmignore` -- the repo-root `.npmignore` is never consulted, because `npm_release` publishes `./npm`. The release `git commit` also tolerates a build that produced nothing to stage.
-* Tooling: `ondewo-proto-compiler` is pinned to [5.14.0](https://github.com/ondewo/ondewo-proto-compiler/releases/tag/5.14.0) in **both** the submodule gitlink and `ONDEWO_PROTO_COMPILER_GIT_BRANCH`, so `make check_out_correct_submodule_versions` can no longer silently downgrade the submodule. This is a pin-only bump: no generated code was regenerated.
+* Tooling: `ondewo-proto-compiler` is pinned in **both** the submodule gitlink and `ONDEWO_PROTO_COMPILER_GIT_BRANCH`, so `make check_out_correct_submodule_versions` can no longer silently downgrade the submodule.
 * CI: `npm test` now gates the whole hand-written surface (`auth/`, `examples/`) at 100% statements, branches, functions and lines with `--all --per-file`, and the new `npm run test:drift` fails the build when `package.json` and `.ci-package.json` disagree.
+
+### Build
+
+* Regenerated with [ondewo-proto-compiler 5.15.2](https://github.com/ondewo/ondewo-proto-compiler/releases/tag/5.15.2)
+  (previous release: 5.11.0) against the unchanged API tag [6.6.0](https://github.com/ondewo/ondewo-t2s-api/releases/tag/6.6.0). The bundle embeds the `google-protobuf` runtime,
+  now pinned to `^4.0.2` (was `^3.21.4`), the line that provides `reader.readStringRequireUtf8()` which the 5.15
+  compiler emits. `tests/bundleStringRoundTrip.spec.js` loads the shipped bundle and round-trips a multi-byte string,
+  so a generator / runtime mismatch fails the build instead of shipping.
+
+### Tests and release notes
+
+* `auth/grpcWebEndpoint.spec.js` and new `auth/offlineTokenProvider.spec.js` cases cover the endpoint builder and the
+  token redaction under the 100% coverage gate.
+* `tests/releaseNotes.spec.js` pins the Makefile's release-notes slice, every heading's spelling, one `*****`
+  separator per section and a non-empty slice for the released version.
 
 *****************
 
