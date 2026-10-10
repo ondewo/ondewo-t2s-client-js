@@ -140,8 +140,10 @@ create_release_tag: ## Create Release Tag and push it to origin
 	git tag -a ${ONDEWO_T2S_VERSION} -m "release/${ONDEWO_T2S_VERSION}"
 	git push origin ${ONDEWO_T2S_VERSION}
 
+# "$${GITHUB_GH_TOKEN}" is expanded by the shell from the environment. $(GITHUB_GH_TOKEN) would be
+# expanded by make INTO the recipe line, i.e. onto the argv of `/bin/sh -c`.
 login_to_gh: ## Login to Github CLI with Access Token
-	@echo $(GITHUB_GH_TOKEN) | gh auth login -p ssh --with-token
+	@printf '%s\n' "$${GITHUB_GH_TOKEN}" | gh auth login -p ssh --with-token
 
 build_gh_release: ## Generate Github Release with CLI
 	gh release create --repo $(GH_REPO) "$(ONDEWO_T2S_VERSION)" -n "$(CURRENT_RELEASE_NOTES)" -t "Release ${ONDEWO_T2S_VERSION}"
@@ -157,7 +159,7 @@ build_compiler: ## Builds Ondewo-Proto-Compiler
 
 release_to_github_via_docker_image: ## Release to Github via docker
 	@docker run --rm \
-		-e GITHUB_GH_TOKEN=${GITHUB_GH_TOKEN} \
+		-e GITHUB_GH_TOKEN \
 		${IMAGE_UTILS_NAME} make push_to_gh
 
 build_utils_docker_image: ## Build utils docker image
@@ -165,13 +167,15 @@ build_utils_docker_image: ## Build utils docker image
 
 publish_npm_via_docker: build_utils_docker_image ## Builds Code, Docker-Image and Releases to NPM
 	@docker run --rm \
-		-e NPM_AUTOMATION_TOKEN=${NPM_AUTOMATION_TOKEN} \
+		-e NPM_AUTOMATION_TOKEN \
 		${IMAGE_UTILS_NAME} make docker_npm_release
 
+# npm reads the literal `${NPM_AUTOMATION_TOKEN}` from .npmrc and substitutes the environment value,
+# so the token itself never appears on npm's argv.
 docker_npm_release: ## Release to npm with docker image
 	node --version
 	npm --version
-	@npm config set //registry.npmjs.org/:_authToken=${NPM_AUTOMATION_TOKEN}
+	@npm config set '//registry.npmjs.org/:_authToken' '$${NPM_AUTOMATION_TOKEN}'
 	npm whoami
 	make npm_release
 
@@ -185,9 +189,15 @@ clone_devops_accounts: ## Clones devops-accounts repo
 	if [ -d $(DEVOPS_ACCOUNT_GIT) ]; then rm -Rf $(DEVOPS_ACCOUNT_GIT); fi
 	git clone git@bitbucket.org:ondewo/${DEVOPS_ACCOUNT_GIT}.git
 
+# The credentials are exported into the sub-make's ENVIRONMENT (anchored `^NAME=` lines only, so a
+# comment mentioning a name cannot break a value). `make release NAME=<value>` would put every value
+# on make's argv, which /proc/<pid>/cmdline shows to every user on the host.
 run_release_with_devops: ## Runs the make release target with credentials from devops-accounts
-	$(eval info:= $(shell cat ${DEVOPS_ACCOUNT_DIR}/account_github.env | grep GITHUB_GH & cat ${DEVOPS_ACCOUNT_DIR}/account_npm.env | grep NPM_AUTOMATION_TOKEN ))
-	@make release $(info)
+	@set -a \
+		&& eval "$$(grep -h -E '^(GITHUB_GH_TOKEN|NPM_AUTOMATION_TOKEN)=' \
+			${DEVOPS_ACCOUNT_DIR}/account_github.env ${DEVOPS_ACCOUNT_DIR}/account_npm.env)" \
+		&& set +a \
+		&& $(MAKE) release
 
 spc: ## Checks if the Release Branch, Tag and Pypi version already exist
 	$(eval filtered_branches:= $(shell git branch --all | grep "release/${ONDEWO_T2S_VERSION}"))
