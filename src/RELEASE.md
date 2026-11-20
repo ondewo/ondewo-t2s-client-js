@@ -2,6 +2,15 @@
 
 *****************
 
+## Release ONDEWO T2S Js Client 6.7.0
+
+### Breaking Changes
+
+* Tracking API Version [6.7.0](https://github.com/ondewo/ondewo-t2s-api/releases/tag/6.7.0) ( [Documentation](https://ondewo.github.io/ondewo-t2s-api/) )
+* Generated with ondewo-proto-compiler 5.17.0 (protoc 35.1). New runtime floors: `grpc-web ^2.1.1` (protoc-gen-grpc-web 2.1.1; responses are limited to 4 MB by default, set `maxReceiveMessageSize` to receive more), `google-protobuf ^4.0.3`.
+
+*****************
+
 ## Release ONDEWO T2S Js Client 6.6.2
 
 ### Improvements
