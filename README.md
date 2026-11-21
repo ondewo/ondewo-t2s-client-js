@@ -64,28 +64,49 @@ npm
 └── README.md
 ```
 
-## Authentication
+## Authentication (Keycloak bearer)
 
-Calls to the ONDEWO API are authenticated with a Keycloak bearer token. Bundle `auth/offlineTokenProvider.js` into your app, call `login()` to obtain a live token provider, then pass its `Authorization` header as gRPC-web metadata on every request:
+Auth is bearer-only. Every gRPC-web call must carry a short-lived Keycloak **bearer** access token in the `Authorization` metadata header.
+
+Obtain and auto-refresh a token with the token provider shipped in `auth/offlineTokenProvider.js`. Start-up is ONE token request against the **public** SDK client `ondewo-nlu-cai-sdk-public` (no client secret), with one of two credentials:
+
+- **a password**: a one-time ROPC login (`grant_type=password`, `scope=offline_access`) as a 2FA-exempt technical user;
+- **a handed-off offline token** (`refreshToken`): one `grant_type=refresh_token` exchange. No password grant is ever sent on this path, not even as a fallback when the token is refused, so N processes sharing one technical user never trip Keycloak's brute-force detection. When both are set, `refreshToken` wins.
+
+The access token is then refreshed 30 s before it expires, in the background and on demand, and both share ONE jittered backoff (5 s doubling up to 300 s): a failed refresh never ends the refresh loop and never causes a request storm, a token that is still valid keeps being served, and only an EXPIRED token whose refresh fails raises `KeycloakAuthenticationError` (a `TokenError` subclass; the underlying error is its `cause`). No error message or log line ever contains a password or a token.
 
 ```js
-const { login } = require('@ondewo/ondewo-t2s-client-js/auth/offlineTokenProvider');
+const {
+    getKeycloakTokenProvider,
+    createAuthUnaryInterceptor
+} = require('@ondewo/ondewo-t2s-client-js/auth/offlineTokenProvider');
 
-const tokenProvider = await login({
-  keycloakUrl: 'https://auth.example.com/auth',
-  realm: 'ondewo-ccai-platform',
-  clientId: 'ondewo-nlu-cai-sdk-public',
-  username: 'tech-user@example.com',
-  password: 'super-secret'
+// One provider (one login) per credential set, shared by every client that asks for it.
+const provider = await getKeycloakTokenProvider({
+    keycloakUrl: 'https://localhost:8443/auth',
+    realm: 'ondewo-ccai-platform',
+    clientId: 'ondewo-nlu-cai-sdk-public',
+    username: 'tech-user@example.com',
+    password: 'super-secret' // or, instead: refreshToken: '<a Keycloak offline refresh token>'
+    // tokenExpirationInS: 3600, // optional: stop refreshing this long after start-up
+    // logger: myLogger,         // optional: { warn, info, debug }; defaults to console
 });
 
-// Pass this metadata to any T2S RPC, e.g. client.synthesize(request, metadata):
-const metadata = { Authorization: tokenProvider.getAuthorizationHeader() }; // "Bearer <jwt>"
+// Every unary call now awaits a fresh `authorization: Bearer <token>` header.
+const client = new Text2SpeechPromiseClient('https://localhost:8443', null, {
+    unaryInterceptors: [createAuthUnaryInterceptor(provider)]
+});
+const response = await client.synthesize(request);
 
-tokenProvider.stop(); // stop the background refresh loop when done
+// grpc-web stream interceptors are synchronous, so pass the metadata to a streaming call yourself:
+const stream = client.someServerStreamingCall(request, await provider.getAuthorizationMetadata());
+
+await provider.close(); // stop the background refresh (or provider.stop() without waiting)
 ```
 
-`login()` performs a one-time password login and then refreshes the short-lived access token in the background, so `getAuthorizationHeader()` always returns a valid `Bearer <jwt>` value. Use the canonical `Authorization` header casing. See `examples/client.js` and `examples/index.html` for a complete, runnable example.
+`login(options)` takes the same options and returns an unshared provider. `getKeycloakTokenProvider` returns `null` when none of `keycloakUrl`, `realm`, `clientId` is set (no auth), and rejects a partial triple or a config with neither `password` nor `refreshToken`. `keycloakVerifySsl: false` (self-signed local Envoy only) is honoured under Node and ignored by browsers, which always verify. `redactLoginOptions(options)` gives a copy that is safe to log. `getAuthorizationHeader()` is kept for existing callers; it is synchronous and therefore never refreshes -- prefer `await getAuthorizationMetadata()`.
+
+See `examples/client.js` and `examples/index.html` for a complete, unit-tested example.
 
 ## TLS, mutual TLS and certificates
 
