@@ -738,7 +738,7 @@ runTestCase('T22 an expired token whose refresh is refused raises the status', a
 });
 
 runTestCase('T23 a transport error on an expired token is raised typed, with its cause', async () => {
-	const cause = new Error('socket hang up');
+	const cause = Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
 	const harness = await makeHarness([token('acc-1'), { error: cause }]);
 	harness.clock.advance(400);
 	const error = await rejection(harness.provider.getAuthorizationMetadata());
@@ -813,7 +813,11 @@ for (const [kind, error] of [
 	['a generic network error', new TypeError('fetch failed')],
 	['connection refused', new TypeError('fetch failed', { cause: new Error('connect ECONNREFUSED 127.0.0.1:443') })],
 	['a timeout', new DOMException('This operation was aborted', 'AbortError')],
-	['a thrown non-Error value', 'boom']
+	['a socket error carrying a code', Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })],
+	['a body cut off mid-stream', new TypeError('terminated')],
+	['a browser network error', new TypeError('Failed to fetch')],
+	['a Firefox network error', new TypeError('NetworkError when attempting to fetch resource.')],
+	['a Safari network error', new TypeError('Load failed')]
 ]) {
 	runTestCase(`T27 ${kind} at start-up is reported as an unreachable endpoint, with its cause`, async () => {
 		const endpoint = makeEndpoint([{ error }]);
@@ -822,6 +826,50 @@ for (const [kind, error] of [
 		assert.equal(failure.cause, error);
 	});
 }
+
+for (const [kind, error, rendered] of [
+	['a thrown non-Error value', 'boom', 'string: boom'],
+	['a RangeError (a transport bug)', new RangeError('transport bug'), 'RangeError: transport bug'],
+	[
+		'a TypeError that is not a network error',
+		new TypeError('init.body is not a function'),
+		'TypeError: init.body is not a function'
+	],
+	['a plain Error with no socket code', new Error('unexpected'), 'Error: unexpected']
+]) {
+	runTestCase(`E1 ${kind} is NOT reported as an unreachable endpoint, but typed, with its cause`, async () => {
+		const endpoint = makeEndpoint([{ error }]);
+		const failure = await rejection(login({ ...BASE_OPTIONS, fetchImpl: endpoint.fetchImpl }));
+		assert.ok(failure instanceof KeycloakAuthenticationError);
+		assert.equal(failure.message, `Keycloak token login failed (${rendered})`);
+		assert.equal(failure.cause, error);
+	});
+}
+
+runTestCase('E1 a non-network error on the refresh path is typed as a failed refresh, not as unreachable', async () => {
+	const harness = await makeHarness([token('acc-1'), { error: new RangeError('transport bug') }]);
+	harness.clock.advance(400);
+	const error = await rejection(harness.provider.getAuthorizationMetadata());
+	assert.equal(error.message, 'Keycloak token refresh failed (RangeError: transport bug)');
+	assert.ok(error.cause instanceof RangeError);
+});
+
+runTestCase('E1 a body that fails to read with a socket error is reported as unreachable', async () => {
+	const cause = Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' });
+	const bodyError = new TypeError('terminated', { cause });
+	const fetchImpl = async () => ({
+		status: 200,
+		text: async () => {
+			throw bodyError;
+		}
+	});
+	const failure = await rejection(login({ ...BASE_OPTIONS, fetchImpl: /** @type {any} */ (fetchImpl) }));
+	assert.equal(
+		failure.message,
+		'Keycloak token login could not reach the token endpoint (TypeError: terminated (other side closed))'
+	);
+	assert.equal(failure.cause, bodyError);
+});
 
 runTestCase('T27 the cause of a fetch failure is named in the message', async () => {
 	const endpoint = makeEndpoint([
@@ -990,17 +1038,25 @@ runTestCase('the realm is URL-encoded into the token endpoint path', async () =>
 	provider.stop();
 });
 
-runTestCase('a password login that yields no usable refresh_token is refused (missing offline_access)', async () => {
-	for (const refreshToken of [undefined, '', 12345]) {
-		const endpoint = makeEndpoint([{ body: { access_token: 'acc-1', expires_in: 300, refresh_token: refreshToken } }]);
-		const failure = await rejection(login({ ...BASE_OPTIONS, fetchImpl: endpoint.fetchImpl }));
-		assert.ok(failure.message.includes('did not contain a refresh_token'), failure.message);
+runTestCase(
+	'S3 a password login without a usable refresh_token is accepted and keeps the previous (none)',
+	async () => {
+		for (const refreshToken of [undefined, '', 12345]) {
+			const endpoint = makeEndpoint([
+				{ body: { access_token: 'acc-1', expires_in: 300, refresh_token: refreshToken } },
+				REFUSED
+			]);
+			const provider = await login({ ...BASE_OPTIONS, fetchImpl: endpoint.fetchImpl, startBackgroundRefresh: false });
+			assert.equal(provider.getAccessToken(), 'acc-1');
+			assert.equal(provider.refreshToken, null);
+			// The renewal sends the (empty) refresh token and never falls back to a password grant.
+			await provider.refresh().catch(() => undefined);
+			assert.deepEqual(endpoint.grants(), ['password', 'refresh_token']);
+			assert.equal(endpoint.requests[1].form.refresh_token, '');
+			provider.stop();
+		}
 	}
-});
-
-// endregion
-
-// region F. no credential in logs or errors
+);
 
 runTestCase('T37 no credential reaches a log line or an error message', async () => {
 	/** @type {string[]} */
@@ -1461,12 +1517,27 @@ runTestCase('T52 T53 the registry key is a 64-hex SHA-256 holding neither the to
 				BASE_OPTIONS.username,
 				'pw-in-key-check',
 				'',
-				'true',
+				'True',
 				'off-in-key-check'
 			].join('\0')
 		)
 		.digest('hex');
 	assert.equal(key, expected);
+});
+
+runTestCase('T54 a provider whose deadline closed is still handed out (no second login), as in python', async () => {
+	clearKeycloakTokenProviders();
+	const clock = makeClock();
+	const endpoint = makeEndpoint([], { clock, fallback: token('acc-1') });
+	const options = registryOptions(endpoint, { nowInMs: clock.nowInMs, tokenExpirationInS: 200 });
+	const first = /** @type {ProviderInstance} */ (await getKeycloakTokenProvider(options));
+	await runLoop(/** @type {any} */ ({ provider: first, clock, waits: [] }), 1000);
+	assert.equal(first.stopped, true);
+	assert.equal(first.closed, false);
+	assert.equal(await getKeycloakTokenProvider(options), first);
+	assert.deepEqual(endpoint.grants(), ['password']);
+	clearKeycloakTokenProviders();
+	assert.equal(first.closed, true);
 });
 
 runTestCase('T54 a stopped provider is never handed to a new client', async () => {

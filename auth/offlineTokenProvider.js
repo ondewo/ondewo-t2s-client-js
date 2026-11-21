@@ -286,6 +286,43 @@ function describeError(error) {
 }
 
 /**
+ * Whether a value thrown by `fetch` (or by reading the response body) means the token endpoint could not be
+ * reached -- connection refused, DNS, TLS, a reset socket or the HTTP timeout -- rather than a defect in an
+ * injected transport. Node's fetch rejects with `TypeError('fetch failed')` (the socket error, carrying a
+ * string `code`, is its `cause`) and a body cut off mid-stream with `TypeError('terminated')`; browsers
+ * reject with a `TypeError` whose text names the fetch / network / load failure; the timeout is an
+ * `AbortError` / `TimeoutError`. Anything else (a `RangeError`, a non-`Error` value, a `TypeError` such as
+ * "x is not a function") is NOT a transport failure, mirroring python's `except OSError`.
+ *
+ * @param {unknown} error
+ *   The thrown value.
+ * @returns {boolean}
+ *   `true` when the endpoint was unreachable.
+ */
+function isNetworkError(error) {
+	if (!(error instanceof Error)) {
+		return false;
+	}
+	if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+		return true;
+	}
+	/**
+	 * The error itself and its cause, either of which may carry the socket error's string `code`.
+	 * @type {unknown[]}
+	 */
+	const candidates = [error, error.cause];
+	if (
+		candidates.some(
+			(candidate) =>
+				candidate instanceof Error && typeof (/** @type {{ code?: unknown }} */ (candidate).code) === 'string'
+		)
+	) {
+		return true;
+	}
+	return error instanceof TypeError && /fetch|network|terminated|load failed/i.test(error.message);
+}
+
+/**
  * Build the OIDC token endpoint URL for a realm, tolerating trailing slashes on `keycloakUrl`.
  *
  * @param {string} keycloakUrl
@@ -417,10 +454,15 @@ async function postTokenRequest(tokenEndpoint, params, fetchImpl, verifySsl, act
 		response = await fetchImpl(tokenEndpoint, init);
 		text = await response.text();
 	} catch (error) {
-		throw new KeycloakAuthenticationError(
-			`Keycloak token ${action} could not reach the token endpoint (${describeError(error)})`,
-			{ cause: error }
-		);
+		if (isNetworkError(error)) {
+			throw new KeycloakAuthenticationError(
+				`Keycloak token ${action} could not reach the token endpoint (${describeError(error)})`,
+				{ cause: error }
+			);
+		}
+		throw new KeycloakAuthenticationError(`Keycloak token ${action} failed (${describeError(error)})`, {
+			cause: error
+		});
 	} finally {
 		clearTimeout(timeoutTimer);
 	}
@@ -640,8 +682,10 @@ async function runRefreshLoop(providerRef, stopSignal, waitImpl, nowInMs, logger
 		/** @type {number | null} */
 		const deadlineInS = provider.deadlineInS;
 		if (deadlineInS !== null && nowInS >= deadlineInS) {
-			// The bounded window has closed: stop renewing and let the token lapse.
-			provider.stop();
+			// The bounded window has closed: stop renewing and let the token lapse. The provider is NOT
+			// closed, so the registry keeps handing it out (as python does) instead of logging in again.
+			provider.stopped = true;
+			stopSignal.fire();
 			return;
 		}
 		/** @type {number} */
@@ -768,6 +812,12 @@ class OfflineTokenProvider {
 		 */
 		this.stopped = false;
 		/**
+		 * Whether {@link OfflineTokenProvider#stop} has been called explicitly. Unlike `stopped`, the
+		 * bounded window closing does NOT set it: the registry refuses only a closed provider.
+		 * @type {boolean}
+		 */
+		this.closed = false;
+		/**
 		 * The stop switch of the background loop; holds no reference to this provider.
 		 * @type {StopSignal}
 		 */
@@ -814,8 +864,7 @@ class OfflineTokenProvider {
 	 * @returns {Promise<void>}
 	 *   Resolves once the initial tokens are stored and the loop is running.
 	 * @throws {KeycloakAuthenticationError}
-	 *   On a failed token request, or when a password login yields no usable `refresh_token` (the SDK
-	 *   client lacks directAccessGrants + the offline_access scope).
+	 *   On a failed token request or an unusable token response.
 	 */
 	async bootstrap(username, password) {
 		/** @type {boolean} */
@@ -844,14 +893,8 @@ class OfflineTokenProvider {
 		);
 		/** @type {ParsedTokens} */
 		const tokens = parseTokenPayload(payload);
-		if (!viaHandedOffToken && tokens.refreshToken === null) {
-			// A blank offline token would bootstrap a provider whose every renewal fails, turning a clear
-			// login error into a silent expiry ~5 minutes later.
-			throw new KeycloakAuthenticationError(
-				'Keycloak token response did not contain a refresh_token; the SDK client must have ' +
-					'directAccessGrants + the offline_access scope (ondewo-nlu-cai-sdk-public)'
-			);
-		}
+		// A login without a refresh_token keeps the previous (absent) one, exactly as every other response
+		// does (spec S3); its renewal then fails visibly through the shared backoff.
 		this.storeTokens(tokens);
 		// Armed after the acquisition on BOTH paths, so the bound means the same with a handed-off token.
 		if (this.tokenExpirationInS !== undefined) {
@@ -1180,6 +1223,7 @@ class OfflineTokenProvider {
 	 * @returns {void}
 	 */
 	stop() {
+		this.closed = true;
 		this.stopped = true;
 		this.stopSignal.fire();
 	}
@@ -1349,7 +1393,8 @@ async function providerRegistryKey(options) {
 		options.tokenExpirationInS === undefined || options.tokenExpirationInS === null
 			? ''
 			: String(options.tokenExpirationInS),
-		String(options.keycloakVerifySsl !== false),
+		// Rendered as python renders the bool, so the key derivation is identical in every SDK.
+		options.keycloakVerifySsl === false ? 'False' : 'True',
 		options.refreshToken === undefined || options.refreshToken === null ? '' : options.refreshToken
 	];
 	/** @type {ArrayBuffer} */
@@ -1359,7 +1404,8 @@ async function providerRegistryKey(options) {
 
 /**
  * Return the SHARED provider for a credential set, creating it (one login) on first use. Concurrent first
- * calls share one creation; a stopped or collected provider is never handed out (a new one is created).
+ * calls share one creation; a closed or collected provider is never handed out (a new one is created). A
+ * provider whose `tokenExpirationInS` window closed is still handed out, as in python: its token lapses.
  * Returns `null` when none of `keycloakUrl`, `realm`, `clientId` is set: no Keycloak, no auth metadata.
  *
  * @param {LoginOptions} options
@@ -1385,7 +1431,7 @@ async function getKeycloakTokenProvider(options) {
 		}
 		/** @type {OfflineTokenProvider | undefined} */
 		const provider = /** @type {NonNullable<RegistrySlot['ref']>} */ (existing.ref).deref();
-		if (provider !== undefined && !provider.stopped) {
+		if (provider !== undefined && !provider.closed) {
 			return provider;
 		}
 	}
